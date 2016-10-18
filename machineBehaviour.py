@@ -26,16 +26,20 @@ class machineState(object):
 
     # Returns a new instance of the machine state evolved for the ambient conditions given
     def machineTimeStep(self, wind, PF, V, Tamb):
+        #print "new_iter", (time.time()- self.start_time )
         newTime = copy.deepcopy(self)                                               # Copy old instance
+        #print "copy", (time.time()- self.start_time )
         newTime.time += datetime.timedelta(seconds = config.dt )                    # Advance time
         newTime.wind = wind                                                         # Load new wind
         newTime.potential = newTime.powerFunction()                                 # Calculate potential power production
         newTime.derateIfNeeded(newTime.potential,PF,V,Tamb)                         # Modify production if derating required
+        #print "precalculation", (time.time()- self.start_time )
         newTime.transformer.timeStep(newTime.power,newTime.PF,newTime.V,Tamb)       # Calculate TRANSFORMER
         newTime.converter.timeStep(newTime.transformer.powerIN,newTime.PF,newTime.V,Tamb) # Calculate CONVERTER
         newTime.generator.timeStep(newTime.converter.powerIN,Tamb)                  # Calculate GENERATOR
         newTime.gearbox.timeStep(newTime.generator.powerIN,Tamb)                    # Calculate GEARBOX
         newTime.nacelle.timeStep(newTime.generator.losses*(1-newTime.generator.split),newTime.gearbox.losses*(1-newTime.gearbox.split),Tamb)
+        #print "components", (time.time()- self.start_time )
         return newTime
     # Returns interpolation of power produtcion given a  wind speed
     def powerFunction(self):

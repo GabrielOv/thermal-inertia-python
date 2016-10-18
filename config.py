@@ -1,7 +1,7 @@
 
 # This file contains assorted variables to make them available in all the molules
 
-dt              = 1
+dt              = 60
 reductionFactor = 10
 exchLag         = 100
 strechFactor    = 10
