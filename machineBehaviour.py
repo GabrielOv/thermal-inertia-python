@@ -375,6 +375,7 @@ class nac_component(object):
     air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
     airC               = 10      #[kW/K] Heat carryng capacity of the water current
     airCold_Limit      = 38
+    exchCoeffs         = [0.1, 1, 1.5, 2, 2.57]
 
     def __init__(self,T_0=0):
         self.airHot        = T_0
@@ -390,16 +391,16 @@ class nac_component(object):
     # Function to chooses the cooling mode as a function of waterCold temperature. Presents hysteresis and a certain lag to avoid constant switching
     def exchCoeffFunc(self):
         self.exchLag  -= 1
-        limitsUp=  [ 0, 39, 41, 43, 45]
-        limitsDown=[ 0, 37, 39, 41, 43]
-        if self.oilCold > limitsUp[self.exchMode]:
+        limitsUp=  [ 0, 29, 32, 35, 39]
+        limitsDown=[ 0, 27, 30, 33, 36]
+        if self.airMiddle > limitsUp[self.exchMode]:
             for i in range(self.exchMode,len(limitsUp)):
-                if self.oilCold > limitsUp[i]:
+                if self.airMiddle > limitsUp[i]:
                     self.exchMode = i
                     self.exchLag  = config.exchLag
-        elif (self.oilCold < limitsDown[self.exchMode]) & (self.exchLag<1) :
+        elif (self.airMiddle < limitsDown[self.exchMode]) & (self.exchLag<1) :
             for i in range(self.exchMode,0,-1):
-                if self.oilCold < limitsDown[i]:
+                if self.airMiddle < limitsDown[i]:
                     self.exchMode = i-1
         #self.water_air_trans = self.exchCoeffs[self.exchMode]
     # Activate alarm if airCold temperature excedes the limit
@@ -409,7 +410,8 @@ class nac_component(object):
         else:
             self.alarm = False
     def nacelleExhangerFunction (self, airHot,Tamb):
-        return (airHot-Tamb)*3
+        self.exchCoeffFunc()
+        return (airHot-Tamb)*self.exchCoeffs[self.exchMode]
     # Calculation o the evolution of internal variables
     def timeStep(self, ge_contribution, gb_contribution, Tamb):
         self.componentsIn = ge_contribution + gb_contribution + 5   # the extra bit is for the other components in the NACELLE
