@@ -73,6 +73,7 @@ class machineState(object):
         self.converter.waterCold_tempLimit = 10000
         self.generator.waterCold_tempLimit = 10000
         self.gearbox.oilCold_tempLimit     = 10000
+        self.nacelle.airCold_Limit         = 10000
 # Object which holds the behaviour parameters and the variables that define the state of a TRANSFORMER
 class tr_component(object):
     solid_oil_trans    = 5.333   #[kW/K] Winddings ---> Oil bath
