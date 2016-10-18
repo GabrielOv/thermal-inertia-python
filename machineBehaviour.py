@@ -26,27 +26,23 @@ class machineState(object):
 
     # Returns a new instance of the machine state evolved for the ambient conditions given
     def machineTimeStep(self, wind, PF, V, Tamb):
-        #print "new_iter", (time.time()- self.start_time )
         newTime = copy.deepcopy(self)                                               # Copy old instance
-        #print "copy", (time.time()- self.start_time )
         newTime.time += datetime.timedelta(seconds = config.dt )                    # Advance time
         newTime.wind = wind                                                         # Load new wind
         newTime.potential = newTime.powerFunction()                                 # Calculate potential power production
         newTime.derateIfNeeded(newTime.potential,PF,V,Tamb)                         # Modify production if derating required
-        #print "precalculation", (time.time()- self.start_time )
         newTime.transformer.timeStep(newTime.power,newTime.PF,newTime.V,Tamb)       # Calculate TRANSFORMER
         newTime.converter.timeStep(newTime.transformer.powerIN,newTime.PF,newTime.V,Tamb) # Calculate CONVERTER
         newTime.generator.timeStep(newTime.converter.powerIN,Tamb)                  # Calculate GENERATOR
         newTime.gearbox.timeStep(newTime.generator.powerIN,Tamb)                    # Calculate GEARBOX
         newTime.nacelle.timeStep(newTime.generator.losses*(1-newTime.generator.split),newTime.gearbox.losses*(1-newTime.gearbox.split),Tamb)
-        #print "components", (time.time()- self.start_time )
         return newTime
     # Returns interpolation of power produtcion given a  wind speed
     def powerFunction(self):
         return  numpy.interp(self.wind, config.powerCurve[0], config.powerCurve[1])
     # Returns a vector with the alarm state for all components
     def getAlarms(self):
-        return [self.transformer.alarm, self.converter.alarm, self.generator.alarm, self.gearbox.alarm]
+        return [self.transformer.alarm, self.converter.alarm, self.generator.alarm, self.gearbox.alarm, self.nacelle.alarm]
     # Evaluates the need to derate and aplies the necessary production modifications at the beginning of the timestep
     def derateIfNeeded(self, power, PF, V, Tamb):
         alarms = self.getAlarms()
@@ -376,11 +372,11 @@ class gb_component(object):
         self.alarmFunc()
 # Object which holds the behaviour parameters and the variables that define the state of a NACELLE
 class nac_component(object):
-    cover_trans        = 1.5     #[kW/K] Gears ---> Oil bath
     air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
     airC               = 10      #[kW/K] Heat carryng capacity of the water current
     airCold_Limit      = 38
     exchCoeffs         = [0.1, 1, 1.5, 2, 2.57]
+    cover_trans        = [0.1, 0.25, 0.5, 1, 1.5]  #[kW/K]
 
     def __init__(self,T_0=0):
         self.airHot        = T_0
@@ -421,7 +417,7 @@ class nac_component(object):
     def timeStep(self, ge_contribution, gb_contribution, Tamb):
         self.componentsIn = ge_contribution + gb_contribution + 5   # the extra bit is for the other components in the NACELLE
 
-        self.coverOut  = (self.airHot   - Tamb) * self.cover_trans
+        self.coverOut  = (self.airHot   - Tamb) * self.cover_trans[self.exchMode]
         self.airMiddle = self.airHot - self.coverOut / self.airC
         self.exchOut   = self.nacelleExhangerFunction(self.airMiddle, Tamb)
 
