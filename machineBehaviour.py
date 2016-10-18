@@ -26,22 +26,15 @@ class machineState(object):
 
     # Returns a new instance of the machine state evolved for the ambient conditions given
     def machineTimeStep(self, wind, PF, V, Tamb):
-        #print ["start iter",(time.time() - self.start_time)]
-        newTime = copy.deepcopy(self)
-        #print ["copy",(time.time() - self.start_time)]                                             # Copy old instance
+        newTime = copy.deepcopy(self)                                               # Copy old instance
         newTime.time += datetime.timedelta(seconds = config.dt )                    # Advance time
         newTime.wind = wind                                                         # Load new wind
         newTime.potential = newTime.powerFunction()                                 # Calculate potential power production
-        newTime.derateIfNeeded(newTime.potential,PF,V,Tamb)
-        #print ["derating",(time.time() - self.start_time)]                         # Modify production if derating required
+        newTime.derateIfNeeded(newTime.potential,PF,V,Tamb)                         # Modify production if derating required
         newTime.transformer.timeStep(newTime.power,newTime.PF,newTime.V,Tamb)       # Calculate TRANSFORMER
-        #print ["trafo",(time.time() - self.start_time)]
         newTime.converter.timeStep(newTime.transformer.powerIN,newTime.PF,newTime.V,Tamb) # Calculate CONVERTER
-        #print ["converter",(time.time() - self.start_time)]
         newTime.generator.timeStep(newTime.converter.powerIN,Tamb)                  # Calculate GENERATOR
-        #print ["generator",(time.time() - self.start_time)]
         newTime.gearbox.timeStep(newTime.generator.powerIN,Tamb)                    # Calculate GEARBOX
-        #print ["gearbox",(time.time() - self.start_time)]
         newTime.nacelle.timeStep(newTime.generator.losses*(1-newTime.generator.split),newTime.gearbox.losses*(1-newTime.gearbox.split),Tamb)
         return newTime
     # Returns interpolation of power produtcion given a  wind speed
@@ -378,13 +371,14 @@ class gb_component(object):
         self.alarmFunc()
 # Object which holds the behaviour parameters and the variables that define the state of a NACELLE
 class nac_component(object):
-    cover_trans        = 5.0     #[kW/K] Gears ---> Oil bath
+    cover_trans        = 1.5     #[kW/K] Gears ---> Oil bath
     air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
-    airC               = 10   #[kW/K] Heat carryng capacity of the water current
+    airC               = 10      #[kW/K] Heat carryng capacity of the water current
     airCold_Limit      = 38
 
     def __init__(self,T_0=0):
         self.airHot        = T_0
+        self.airMiddle     = T_0
         self.airCold       = T_0
         self.coverOut      = 0
         self.componentsIn  = 0
@@ -418,10 +412,11 @@ class nac_component(object):
         return (airHot-Tamb)*3
     # Calculation o the evolution of internal variables
     def timeStep(self, ge_contribution, gb_contribution, Tamb):
-        self.componentsIn = ge_contribution + gb_contribution + 10   # the extra bit is for the other components in the NACELLE
+        self.componentsIn = ge_contribution + gb_contribution + 5   # the extra bit is for the other components in the NACELLE
 
-        self.coverOut = (self.airHot   - Tamb) * self.cover_trans
-        self.exchOut  = self.nacelleExhangerFunction(self.airHot, Tamb)
+        self.coverOut  = (self.airHot   - Tamb) * self.cover_trans
+        self.airMiddle = self.airHot - self.coverOut / self.airC
+        self.exchOut   = self.nacelleExhangerFunction(self.airMiddle, Tamb)
 
         self.airCold   += (self.componentsIn - self.coverOut - self.exchOut) * config.dt  / self.air_int
 

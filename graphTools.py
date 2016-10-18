@@ -535,53 +535,56 @@ def powerVsPotentialgraph(stateSeries):
         data = [tracePowerPot, tracePower, tracePF, traceV]
         fig = go.Figure(data=data, layout=layout)
         pyoff.plot(fig, filename='potentialPowerSeries.html')
-
-
 def graphNacelle(stateSeries):
 
-    nacGraph = [[item.nacelle.airHot    for item in stateSeries],
-                 [item.nacelle.airCold   for item in stateSeries],
-                 [item.nacelle.coverOut  for item in stateSeries],
+    nacGraph = [[item.nacelle.airHot         for item in stateSeries],
+                 [item.nacelle.airMiddle     for item in stateSeries],
+                 [item.nacelle.airCold       for item in stateSeries],
+                 [item.nacelle.coverOut      for item in stateSeries],
                  [item.nacelle.componentsIn  for item in stateSeries],
-                 [item.nacelle.exchOut  for item in stateSeries],
-                 [item.Tamb                for item in stateSeries],
-                 [item.converter.airCold for item in stateSeries if item.nacelle.alarm]]
+                 [item.nacelle.exchOut       for item in stateSeries],
+                 [item.Tamb                  for item in stateSeries],
+                 [item.converter.airCold     for item in stateSeries if item.nacelle.alarm]]
     nacelleTimes = [item.time for item in stateSeries]
     nacelleExcesTimes   = [item.time for item in stateSeries if item.nacelle.alarm]
 
     traceNac = []
     traceNac.append(go.Scatter(x = nacelleTimes,
-                                y = nacGraph[0],
-                                name = 'Air Hot T',
-                                line = dict(color = 'lime', width = 1, dash = 'dot')))
+                               y = nacGraph[0],
+                               name = 'Air Hot T',
+                               line = dict(color = 'lime', width = 1)))
     traceNac.append(go.Scatter(x = nacelleTimes,
-                                y = nacGraph[1],
-                                name = 'Air Cold T',
-                                line = dict(color = 'dodgerblue', width = 1, dash = 'dot')))
+                               y = nacGraph[1],
+                               name = 'Air Middle T',
+                               line = dict(color = 'seagreen', width = 1)))
     traceNac.append(go.Scatter(x = nacelleTimes,
-                                y = nacGraph[2],
-                                name = 'Cover Out kW',
-                                yaxis = 'y2',
-                                line = dict(color = 'darkturquoise')))
+                               y = nacGraph[2],
+                               name = 'Air Cold T',
+                               line = dict(color = 'dodgerblue', width = 1)))
     traceNac.append(go.Scatter(x = nacelleTimes,
-                                y = nacGraph[3],
-                                name  = 'Components In kW',
-                                yaxis = 'y2',
-                                line  = dict(color = 'olive')))
+                               y = nacGraph[3],
+                               name = 'Cover Out kW',
+                               yaxis = 'y2',
+                               line = dict(color = 'darkturquoise')))
     traceNac.append(go.Scatter(x = nacelleTimes,
-                                y = nacGraph[4],
-                                name  = 'Exchanger Out In kW',
-                                yaxis = 'y2',
-                                line  = dict(color = 'green')))
+                               y = nacGraph[4],
+                               name  = 'Components In kW',
+                               yaxis = 'y2',
+                               line  = dict(color = 'olive')))
     traceNac.append(go.Scatter(x = nacelleTimes,
-                                y = nacGraph[5],
-                                name = 'Ambient T',
-                                line = dict(color = 'black')))
+                               y = nacGraph[5],
+                               name  = 'Exchanger Out In kW',
+                               yaxis = 'y2',
+                               line  = dict(color = 'green')))
+    traceNac.append(go.Scatter(x = nacelleTimes,
+                               y = nacGraph[6],
+                               name = 'Ambient T',
+                               line = dict(color = 'black')))
     traceNac.append(go.Scatter(x = nacelleExcesTimes,
-                                y = nacGraph[6],
-                                name = 'Temperature ALARM!!',
-                                mode = 'markers',
-                                marker = dict(size = 10, color = 'red',)))
+                               y = nacGraph[7],
+                               name = 'Temperature ALARM!!',
+                               mode = 'markers',
+                               marker = dict(size = 10, color = 'red',)))
 
 
     layout = dict(
