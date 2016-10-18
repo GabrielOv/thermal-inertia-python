@@ -6,7 +6,6 @@ import numpy as np
 from plotly import tools
 from datetime import datetime
 
-from machineBehaviour import *
 import config
 
 # Graphs related with component internal temperatures and ambient conditions
@@ -130,14 +129,14 @@ def windTemperatureHeatMap(stateSeries):
             t=50
         ),
         hovermode='closest',
-        bargap=0,
+        bargap=10,
         xaxis2=dict(
-            domain=[0.85, 1],
+            domain=[0.9, 1],
             showgrid=False,
             zeroline=False
         ),
         yaxis2=dict(
-            domain=[0.85, 1],
+            domain=[0.9, 1],
             showgrid=False,
             zeroline=False
         )
