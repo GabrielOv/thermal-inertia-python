@@ -467,6 +467,7 @@ def graphGearbox(stateSeries):
 
     fig = go.Figure(data=traceGear, layout=layout)
     pyoff.plot(fig, filename='gearTempsGraph.html', auto_open=False)
+# Timeseries of temperate and cooling conditions in the NACELLE
 def graphNacelle(stateSeries):
 
     nacelleReducedSeries = reduceNacellePoints(stateSeries)
@@ -540,7 +541,6 @@ def graphNacelle(stateSeries):
 
     fig = go.Figure(data=traceNac, layout=layout)
     pyoff.plot(fig, filename='nacelleTempsGraph.html', auto_open=False)
-
 # Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on transformer.oilHot
 def reduceTrafoPoints(inputSeries):
     outputSeries = []
