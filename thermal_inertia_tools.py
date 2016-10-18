@@ -43,7 +43,10 @@ def polynomial_from_coeffs( x, coeffs ):
     for i in range(len(coeffs)):
         y = y + coeffs[i]*x**i
     return y
-
+#
+def calculateAEP(stateSeries):
+    print('Expected AEP         :   %i MW h' % (sum(item.potential for item in stateSeries)*525600/len(stateSeries)/1000/60))
+    print('Expected AEP derated :   %i MW h' % (sum(item.power     for item in stateSeries)*525600/len(stateSeries)/1000/60))
 class countcalls(object):
    "Decorator that keeps track of the number of times a function is called."
 

@@ -467,85 +467,18 @@ def graphGearbox(stateSeries):
 
     fig = go.Figure(data=traceGear, layout=layout)
     pyoff.plot(fig, filename='gearTempsGraph.html', auto_open=False)
-# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on transformer.oilHot
-def reduceTrafoPoints(inputSeries):
-    outputSeries = []
-    for i in range(len(inputSeries)-1):
-        if (i%config.reductionFactor == 0):
-            outputSeries.append(inputSeries[i])
-        if (i%config.reductionFactor != 0) & (inputSeries[i].transformer.oilHot > outputSeries[-1].transformer.oilHot):
-            outputSeries[-1] = inputSeries[i]
-    return outputSeries
-# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on converter.waterCold
-def reduceConverterPoints(inputSeries):
-    outputSeries = []
-    for i in range(len(inputSeries)-1):
-        if (i%config.reductionFactor == 0):
-            outputSeries.append(inputSeries[i])
-        if (i%config.reductionFactor != 0) & (inputSeries[i].converter.waterCold > outputSeries[-1].converter.waterCold):
-            outputSeries[-1] = inputSeries[i]
-    return outputSeries
-# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on generator.waterCold
-def reduceGeneratorPoints(inputSeries):
-    outputSeries = []
-    for i in range(len(inputSeries)-1):
-        if (i%config.reductionFactor == 0):
-            outputSeries.append(inputSeries[i])
-        if (i%config.reductionFactor != 0) & (inputSeries[i].generator.waterCold > outputSeries[-1].generator.waterCold):
-            outputSeries[-1] = inputSeries[i]
-    return outputSeries
-# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on gearbox.oilCold
-def reduceGearboxPoints(inputSeries):
-    outputSeries = []
-    for i in range(len(inputSeries)-1):
-        if (i%config.reductionFactor == 0):
-            outputSeries.append(inputSeries[i])
-        if (i%config.reductionFactor != 0) & (inputSeries[i].gearbox.oilCold > outputSeries[-1].gearbox.oilCold):
-            outputSeries[-1] = inputSeries[i]
-    return outputSeries
-# Timeseries comparing achievable power production and desired grid conditions with those necessary due to derating
-def powerVsPotentialgraph(stateSeries):
-        potentialPower  = [item.potential/1000  for item in stateSeries]
-        times           = [item.time  for item in stateSeries]
-        deratedPower    = [item.power/1000 for item in stateSeries]
-        deratedPF       = [item.PF    for item in stateSeries]
-        deratedV        = [item.V     for item in stateSeries]
-
-        tracePowerPot = go.Scatter(x=times[0::config.reductionFactor],  y=potentialPower[0::config.reductionFactor],  name='Potential Power',line = dict(color = 'blue', width = 1,dash = 'dot'))
-        tracePower    = go.Scatter(x=times[0::config.reductionFactor],  y=deratedPower[0::config.reductionFactor],  name='Derated Power')
-
-        tracePF = go.Scatter(x=times[0::config.reductionFactor], y=deratedPF[0::config.reductionFactor], name='Power Factor', yaxis='y2')
-        traceV  = go.Scatter(x=times[0::config.reductionFactor], y=deratedV[0::config.reductionFactor], name='Grid Voltage', yaxis='y2')
-
-        layout = dict(
-            title='Power Series in Bremerhaven Airport',
-            xaxis=dict(
-                rangeslider=dict(),
-                type='date'
-            ),
-            yaxis=dict(
-                title='Produced Power [MW]'
-            ),
-            yaxis2=dict(
-                title='Power Factor and V Grid [-]',
-                overlaying='y',
-                side='right',
-                range      = [0, 1.1]
-            )
-        )
-        data = [tracePowerPot, tracePower, tracePF, traceV]
-        fig = go.Figure(data=data, layout=layout)
-        pyoff.plot(fig, filename='potentialPowerSeries.html', auto_open=False)
 def graphNacelle(stateSeries):
 
-    nacGraph = [[item.nacelle.airHot         for item in stateSeries],
-                 [item.nacelle.airMiddle     for item in stateSeries],
-                 [item.nacelle.airCold       for item in stateSeries],
-                 [item.nacelle.coverOut      for item in stateSeries],
-                 [item.nacelle.componentsIn  for item in stateSeries],
-                 [item.nacelle.exchOut       for item in stateSeries],
-                 [item.Tamb                  for item in stateSeries],
-                 [item.converter.airCold     for item in stateSeries if item.nacelle.alarm]]
+    nacelleReducedSeries = reduceNacellePoints(stateSeries)
+
+    nacGraph = [[item.nacelle.airHot         for item in nacelleReducedSeries],
+                 [item.nacelle.airMiddle     for item in nacelleReducedSeries],
+                 [item.nacelle.airCold       for item in nacelleReducedSeries],
+                 [item.nacelle.coverOut      for item in nacelleReducedSeries],
+                 [item.nacelle.componentsIn  for item in nacelleReducedSeries],
+                 [item.nacelle.exchOut       for item in nacelleReducedSeries],
+                 [item.Tamb                  for item in nacelleReducedSeries],
+                 [item.converter.airCold     for item in nacelleReducedSeries if item.nacelle.alarm]]
     nacelleTimes = [item.time for item in stateSeries]
     nacelleExcesTimes   = [item.time for item in stateSeries if item.nacelle.alarm]
 
@@ -607,3 +540,82 @@ def graphNacelle(stateSeries):
 
     fig = go.Figure(data=traceNac, layout=layout)
     pyoff.plot(fig, filename='nacelleTempsGraph.html', auto_open=False)
+
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on transformer.oilHot
+def reduceTrafoPoints(inputSeries):
+    outputSeries = []
+    for i in range(len(inputSeries)-1):
+        if (i%config.reductionFactor == 0):
+            outputSeries.append(inputSeries[i])
+        if (i%config.reductionFactor != 0) & (inputSeries[i].transformer.oilHot > outputSeries[-1].transformer.oilHot):
+            outputSeries[-1] = inputSeries[i]
+    return outputSeries
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on converter.waterCold
+def reduceConverterPoints(inputSeries):
+    outputSeries = []
+    for i in range(len(inputSeries)-1):
+        if (i%config.reductionFactor == 0):
+            outputSeries.append(inputSeries[i])
+        if (i%config.reductionFactor != 0) & (inputSeries[i].converter.waterCold > outputSeries[-1].converter.waterCold):
+            outputSeries[-1] = inputSeries[i]
+    return outputSeries
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on generator.waterCold
+def reduceGeneratorPoints(inputSeries):
+    outputSeries = []
+    for i in range(len(inputSeries)-1):
+        if (i%config.reductionFactor == 0):
+            outputSeries.append(inputSeries[i])
+        if (i%config.reductionFactor != 0) & (inputSeries[i].generator.waterCold > outputSeries[-1].generator.waterCold):
+            outputSeries[-1] = inputSeries[i]
+    return outputSeries
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on gearbox.oilCold
+def reduceGearboxPoints(inputSeries):
+    outputSeries = []
+    for i in range(len(inputSeries)-1):
+        if (i%config.reductionFactor == 0):
+            outputSeries.append(inputSeries[i])
+        if (i%config.reductionFactor != 0) & (inputSeries[i].gearbox.oilCold > outputSeries[-1].gearbox.oilCold):
+            outputSeries[-1] = inputSeries[i]
+    return outputSeries
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on nacelle.airHot
+def reduceNacellePoints(inputSeries):
+    outputSeries = []
+    for i in range(len(inputSeries)-1):
+        if (i%config.reductionFactor == 0):
+            outputSeries.append(inputSeries[i])
+        if (i%config.reductionFactor != 0) & (inputSeries[i].nacelle.airHot > outputSeries[-1].nacelle.airHot):
+            outputSeries[-1] = inputSeries[i]
+    return outputSeries
+# Timeseries comparing achievable power production and desired grid conditions with those necessary due to derating
+def powerVsPotentialgraph(stateSeries):
+        potentialPower  = [item.potential/1000  for item in stateSeries]
+        times           = [item.time  for item in stateSeries]
+        deratedPower    = [item.power/1000 for item in stateSeries]
+        deratedPF       = [item.PF    for item in stateSeries]
+        deratedV        = [item.V     for item in stateSeries]
+
+        tracePowerPot = go.Scatter(x=times[0::config.reductionFactor],  y=potentialPower[0::config.reductionFactor],  name='Potential Power',line = dict(color = 'blue', width = 1,dash = 'dot'))
+        tracePower    = go.Scatter(x=times[0::config.reductionFactor],  y=deratedPower[0::config.reductionFactor],  name='Derated Power')
+
+        tracePF = go.Scatter(x=times[0::config.reductionFactor], y=deratedPF[0::config.reductionFactor], name='Power Factor', yaxis='y2')
+        traceV  = go.Scatter(x=times[0::config.reductionFactor], y=deratedV[0::config.reductionFactor], name='Grid Voltage', yaxis='y2')
+
+        layout = dict(
+            title='Power Series in Bremerhaven Airport',
+            xaxis=dict(
+                rangeslider=dict(),
+                type='date'
+            ),
+            yaxis=dict(
+                title='Produced Power [MW]'
+            ),
+            yaxis2=dict(
+                title='Power Factor and V Grid [-]',
+                overlaying='y',
+                side='right',
+                range      = [0, 1.1]
+            )
+        )
+        data = [tracePowerPot, tracePower, tracePF, traceV]
+        fig = go.Figure(data=data, layout=layout)
+        pyoff.plot(fig, filename='potentialPowerSeries.html', auto_open=False)

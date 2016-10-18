@@ -12,7 +12,6 @@ config.powerCurve         = loadPowerCurve(9000)                       # Load a 
 [winds, temperatures]     = loadWindTemperatureSeries(testing = False) # Load wind and temperature time series
 [powerFactor,gridVoltage] = [0.925, 0.9]                               # Default Grid conditions, they might be modified because of derating
 stateSeries               = [machineState(temperatures[0])]            # All components start at the same temperature as the ambient
-#stateSeries[0].removeTempLimits()
 
 print "Simulation will calculate %i days or until ambient data runs out" % timeToSimulate.days
 i = 0
@@ -22,12 +21,11 @@ while ((stateSeries[-1].time - stateSeries[0].time) < timeToSimulate) & bool(win
     stateSeries.append(stateSeries[-1].machineTimeStep(winds[i], powerFactor, gridVoltage, temperatures[i]))
     i += 1
     if i%14400 == 0: print (stateSeries[-1].time - stateSeries[0].time).days, "days completed in ", int(time.time()-calc_begining_time), "seconds"
-    # Removes the first element of the ambient conditions list
 
-print('Expected AEP         :   %i MW h' % (sum(item.potential for item in stateSeries)*525600/len(stateSeries)/1000/60))
-print('Expected AEP derated :   %i MW h' % (sum(item.power     for item in stateSeries)*525600/len(stateSeries)/1000/60))
-print('Calculation took     :   %i seconds'  % (time.time() - calc_begining_time))
+calculateAEP(stateSeries)
 calc_end_time        = time.time()
+print('Calculation took     :   %i seconds'  % (calc_end_time - calc_begining_time))
+
 outputRequestedGraphs(stateSeries)                      # Graphs related with component internal temperatures and ambient conditions
 powerVsPotentialgraph(stateSeries)                      # Graph comparing potential and derated production
 
