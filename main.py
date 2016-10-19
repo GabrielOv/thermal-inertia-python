@@ -7,16 +7,16 @@ from machineBehaviour      import *
 
 print "Loading data series, power curve and starting conditions"
 start_time                = time.time()
-timeToSimulate            = datetime.timedelta(days = 30)              # For how loong should the simulation run
-config.powerCurve         = loadPowerCurve(9000)                       # Load a power curve limmeiting at the max power
-[winds, temperatures]     = loadWindTemperatureSeries(testing = False) # Load wind and temperature time series
-[powerFactor,gridVoltage] = [0.925, 0.9]                               # Default Grid conditions, they might be modified because of derating
+timeToSimulate            = datetime.timedelta(days = 10)              # For how loong should the simulation run
+config.powerCurve         = loadPowerCurve(8000)                       # Load a power curve limmeiting at the max power
+[winds, temperatures]     = loadWindTemperatureSeries(testing = True) # Load wind and temperature time series
+[powerFactor,gridVoltage] = [0.9, 0.9]                               # Default Grid conditions, they might be modified because of derating
 stateSeries               = [machineState(temperatures[0])]            # All components start at the same temperature as the ambient
 
 print "Simulation will calculate %i days or until ambient data runs out" % timeToSimulate.days
 i = 0
 calc_begining_time        = time.time()
-while ((stateSeries[-1].time - stateSeries[0].time) < timeToSimulate) & bool(winds) & bool(temperatures):
+while ((stateSeries[-1].time - stateSeries[0].time) < timeToSimulate) & (i< min(len(winds), len(temperatures))):
     # Appends a new timestep to the series
     stateSeries.append(stateSeries[-1].machineTimeStep(winds[i], powerFactor, gridVoltage, temperatures[i]))
     i += 1

@@ -246,7 +246,8 @@ class gn_component(object):
         self.heatOut   = 0
     # Generator heat losses as a function of generator output power
     def lossFunction(self):
-        self.losses = polynomial_from_coeffs(self.powerOUT/1000, [25.052, 27.678, -0.816, -0.470, 0.050])
+        #self.losses = polynomial_from_coeffs(self.powerOUT/1000, [25.052, 27.678, -0.816, -0.470, 0.050])
+        self.losses = self.powerOUT*14.348/1000
         self.powerIN = self.powerOUT + self.losses
     # Function to chooses the cooling mode as a function of waterCold temperature. Presents hysteresis and a certain lag to avoid constant switching
     def exchCoeffFunc(self):
@@ -325,7 +326,8 @@ class gb_component(object):
         self.oilWater  = 0
     # Gearbox heat losses as a function of gearbox output power
     def lossFunction(self):
-        eff=numpy.interp(self.powerOUT/1000, [0.4, 2.4, 7.2, 10],[0.972, 0.972, 0.985,0.985])
+        eff=numpy.interp(self.powerOUT/1000, [0.0,   0.9,    1.8,    2.97,   3.6,    4.68,   5.4,    6.3,    7.2,    7.65,   9],
+                                             [0.849, 0.9599, 0.9713, 0.9801, 0.9818, 0.9845, 0.9858, 0.9868, 0.9878, 0.9882, 0.989])
         self.losses  = (20*self.powerOUT/9000 + self.powerOUT*( 1 - eff )/eff)
         self.powerIN = self.powerOUT + self.losses
     # Function to chooses the cooling mode as a function of waterCold temperature. Presents hysteresis and a certain lag to avoid constant switching
@@ -375,7 +377,7 @@ class nac_component(object):
     air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
     airC               = 10      #[kW/K] Heat carryng capacity of the water current
     airCold_Limit      = 38
-    exchCoeffs         = [0.1, 1, 1.5, 2, 2.57]
+    exchCoeffs         = [0.1, 1, 1.5, 2, 2.556]
     cover_trans        = [0.1, 0.25, 0.5, 1, 1.5]  #[kW/K]
 
     def __init__(self,T_0=0):
