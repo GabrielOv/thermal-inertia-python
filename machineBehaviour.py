@@ -427,3 +427,18 @@ class nac_component(object):
 
         self.airHot     = self.airCold   + self.componentsIn / self.airC
         self.alarmFunc()
+# Object which holds the behaviour parameters and the variables that define the state of a AIRMASS in tower and NACELLE
+class air_matrix(object):
+    GraphBondMatrix=[[-1, 0, 0],
+                     [ 1,-1,-1],
+                     [ 0, 1, 0],
+                     [ 0, 0, 1]]
+    def __init__(self,nodes,branches,T_0=0,P_0=0):
+        self.Mbranches     = [0]*branches
+        self.Mexternals    = [0]*nodes
+
+        self.Pnodes        = [P_0]*nodes
+        self.Pdrops        = [P_0]*branches
+
+        self.Tbranches     = [T_0]*branches
+        self.Tnodes        = [T_0]*nodes
