@@ -10,7 +10,7 @@ def loadPowerCurve( ratedPower ):
 
     powerCurve=[[],[]]
 
-    with open('PowerCurve.csv', 'rb') as csvfile:
+    with open('/home/govejero/Documents/AD8/thermal-inertia-python/PowerCurve.csv', 'r') as csvfile:
         powerCurveReader = csv.reader(csvfile, delimiter=';', quotechar='|')
         for row in powerCurveReader:
             powerCurve[0].append(float(row[0]))
@@ -28,11 +28,11 @@ def loadWindTemperatureSeries( testing = False  ):
         windSeries        = [config.dummyWind]*(config.dataSetLength/2)
         windSeries.extend([0]*(config.dataSetLength/2))
     else:       # Returns the time series contained in the csv files specified
-        with open('TemperatureBMHV.csv', 'rb') as csvfile:
+        with open('/home/govejero/Documents/AD8/thermal-inertia-python/TemperatureBMHV.csv', 'r') as csvfile:
             temperatureReader = csv.reader(csvfile, delimiter=';', quotechar='|')
             for row in temperatureReader:
                 temperatureSeries.extend([float(row[0])]*config.strechFactor)
-        with open('WindBMHV.csv', 'rb') as csvfile:
+        with open('/home/govejero/Documents/AD8/thermal-inertia-python/WindBMHV.csv', 'r') as csvfile:
             windReader = csv.reader(csvfile, delimiter=';', quotechar='|')
             for row in windReader:
                 windSeries.extend([float(row[0])]*config.strechFactor)

@@ -9,4 +9,5 @@ powerCurve      = []
 dataSetLength   = 2000
 dummyTamb       = 25
 dummyWind       = 15
+currentLocation = '/home/govejero/Documents/AD8/thermal-inertia-python/'
 #Comment to test

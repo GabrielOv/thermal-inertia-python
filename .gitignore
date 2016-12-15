@@ -89,5 +89,5 @@ ENV/
 .ropeproject
 
 # Result Files
-.html
-.pyc
+*.html
+*.pyc

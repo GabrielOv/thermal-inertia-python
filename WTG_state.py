@@ -21,7 +21,6 @@ def cv_CoeffFunc(cv_waterCold,cv_exch_coeff_pre): #[kW/K]
     cv_LimitsDown=[-273, 0, 27, 31, 35, 39]
     return hysteresisFunc(cv_waterCold, cv_LimitsUp, cv_LimitsDown, cv_exch_coeff_pre)
 
-
 def gn_CoeffFunc(gn_waterCold, gn_exch_coeff_pre): #[kW/K]
     gn_LimitsUp=  [-273, 0, 35, 38, 41, 44]
     gn_LimitsDown=[-273, 0, 31, 34, 37, 40]
