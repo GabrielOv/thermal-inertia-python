@@ -1,0 +1,6 @@
+Start,End,dropCoeff,minForced,maxForced
+entrance,room,1,0,100
+room,exit1,1,0,100
+room,exit2,1,0,100
+exit1,entrance,0,2,2
+exit2,entrance,0,2,2

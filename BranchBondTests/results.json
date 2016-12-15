@@ -1,0 +1,49 @@
+{
+    "Problem": [
+        {
+            "Lower bound": -Infinity, 
+            "Name": "tmp_dHuRj.pyomo", 
+            "Number of constraints": 13, 
+            "Number of nonzeros": 21, 
+            "Number of objectives": 1, 
+            "Number of variables": 9, 
+            "Sense": "minimize", 
+            "Upper bound": Infinity
+        }
+    ], 
+    "Solution": [
+        {
+            "number of solutions": 1, 
+            "number of solutions displayed": 1
+        }, 
+        {
+            "Constraint": "No values", 
+            "Gap": 0.0, 
+            "Message": null, 
+            "Objective": {
+                "costTotal": {
+                    "Value": 20
+                }
+            }, 
+            "Problem": {}, 
+            "Status": "optimal", 
+            "Variable": {
+                "amount[entrance,room2]": {
+                    "Value": 10
+                }, 
+                "amount[room2,exit1]": {
+                    "Value": 10
+                }
+            }
+        }
+    ], 
+    "Solver": [
+        {
+            "Error rc": 0, 
+            "Status": "ok", 
+            "Termination condition": "unknown", 
+            "Time": 0.012907981872558594, 
+            "User time": -1.0
+        }
+    ]
+}

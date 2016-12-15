@@ -1,0 +1,52 @@
+set places := entrance 
+              center 
+              exitA 
+              exitB;
+
+set routes := (entrance,center) 
+              (center  ,exitA) 
+              (center  ,exitB)
+              (exitA   , entrance) 
+              (exitB   , entrance);
+
+param supply := entrance 5
+                center   0
+                exitA    0
+                exitB    0;
+
+param demand := entrance 0
+                center   0
+                exitA    2.5
+                exitB    2.5;
+
+
+param pCoeff := entrance center   1
+                center   exitA    1
+                center   exitB    1
+                exitA    entrance 1
+                exitB    entrance 1;
+
+param minFlow := entrance center 0
+                 center   exitA   0
+                 center   exitB   0
+                 exitA    entrance 2
+                 exitB    entrance 2;
+
+param maxFlow := entrance center 100
+                 center   exitA   100
+                 center   exitB   100
+                 exitA    entrance 2
+                 exitB    entrance 2;
+                 
+param minP := entrance 0
+              center   0
+              exitA    1000
+              exitB    1000;
+              
+param maxP := entrance 2000
+              center   2000
+              exitA    1000
+              exitB    1000;
+                
+                
+                

@@ -1,0 +1,52 @@
+set nodes := entrance
+             room
+             exit1
+             exit2;
+
+set bonds := (entrance,room)
+              (room,exit1)
+              (room,exit2)
+              (exit1,entrance)
+              (exit1,room)
+              (exit2,entrance);
+
+param source := entrance 10
+                room     0
+                exit1    0
+                exit2    0;
+
+param sink := entrance 0
+              room     0
+              exit1    0
+              exit2    0;
+
+param minForced := entrance room    0
+                   room    exit1    0
+                   room    exit2    0
+                   exit1   entrance 2
+                   exit1   room     2
+                   exit2   entrance 2;
+
+param maxForced := entrance room    100
+                   room    exit1    100
+                   room    exit2    100
+                   exit1   entrance 2
+                   exit1   room     2
+                   exit2   entrance 2;
+
+param minExterior := entrance  0
+                     room      0
+                     exit1     0
+                     exit2     0;
+
+param maxExterior := entrance  0
+                     room      0
+                     exit1     1000
+                     exit2     1000;
+
+param dropCoeff :=  entrance room    1
+                    room    exit1    2
+                    room    exit2    1
+                    exit1   room     0
+                    exit1   entrance 0
+                    exit2   entrance 0;

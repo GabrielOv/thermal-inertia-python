@@ -1,0 +1,53 @@
+# ==========================================================
+# = Solver Results                                         =
+# ==========================================================
+# ----------------------------------------------------------
+#   Problem Information
+# ----------------------------------------------------------
+Problem: 
+- Lower bound: -inf
+  Upper bound: inf
+  Number of objectives: 1
+  Number of constraints: 14
+  Number of variables: 10
+  Sense: unknown
+# ----------------------------------------------------------
+#   Solver Information
+# ----------------------------------------------------------
+Solver: 
+- Status: ok
+  Message: Ipopt 3.7.1\x3a Optimal Solution Found
+  Termination condition: optimal
+  Id: 0
+  Error rc: 0
+  Time: 0.011434555053710938
+# ----------------------------------------------------------
+#   Solution Information
+# ----------------------------------------------------------
+Solution: 
+- number of solutions: 1
+  number of solutions displayed: 1
+- Gap: None
+  Status: optimal
+  Message: Ipopt 3.7.1\x3a Optimal Solution Found
+  Objective:
+    OBJ:
+      Value: 366.6666666666667
+  Variable:
+    exterior[exit1]:
+      Value: 1.3333333339424602
+    exterior[exit2]:
+      Value: 8.66666666605754
+    flow[entrance,room]:
+      Value: 14
+    flow[exit1,entrance]:
+      Value: 2
+    flow[exit1,room]:
+      Value: 2
+    flow[exit2,entrance]:
+      Value: 2
+    flow[room,exit1]:
+      Value: 5.33333333394246
+    flow[room,exit2]:
+      Value: 10.66666666605754
+  Constraint: No values
