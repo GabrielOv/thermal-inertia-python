@@ -1,5 +1,11 @@
-Node,source,sink,minExterior,maxExterior,minP,maxP
-entrance,10,0,0,0,500,1500
-room,0,0,0,0,500,1500
-exit1,0,0,0,100,1000,1000
-exit2,0,0,0,100,500,500
+Node,minExterior,maxExterior,minP,maxP
+Air treatment system,10,10,0,1500
+Tower leakage exterior,-100,100,500,500
+Converter inlet,0,0,0,1500
+Transformer inlet,0,0,0,1500
+Switchgear inlet,0,0,0,1500
+Converter platform,0,0,0,1500
+Transformer platform,0,0,0,1500
+Switchgear platform,0,0,0,1500
+Tower middle,0,0,0,1500
+Tower top,0,0,0,1500
