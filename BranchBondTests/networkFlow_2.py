@@ -4,7 +4,8 @@ import pyomo.opt
 import pyomo.environ as pyoenv
 import numpy as np
 
-class MinCostFlow:
+class FlowBalance:
+
     def __init__(self, nodesfile, bondsfile):
         """Read in the csv data."""
         # Read in the nodes file
@@ -32,44 +33,50 @@ class MinCostFlow:
         # Create variables
         self.model.flow     = pyoenv.Var(self.model.bond_set,
                                          domain=pyoenv.NonNegativeReals,initialize =1)
-                                        #  initialize = {('entrance','room'):14,
-                                        #                ('room','exit1'):7,
-                                        #                ('room','exit2'):7,
-                                        #                ('exit1','entrance'):2,
-                                        #                ('exit2','entrance'):2})
-
         self.model.pressure = pyoenv.Var(self.model.node_set,
                                          domain=pyoenv.NonNegativeReals,initialize =1)
-                                        #  initialize={'entrance':1245,
-                                        #              'room':1049,
-                                        #              'exit1':1000,
-                                        #              'exit2':1000})
-
         self.model.exterior = pyoenv.Var(self.model.node_set,
                                          domain=pyoenv.Reals,initialize =1)
-                                        #  initialize={'entrance':10,
-                                        #              'room':0,
-                                        #              'exit1':-5,
-                                        #              'exit2':-5})
+        self.model.temper   = pyoenv.Var(self.model.node_set,
+                                          domain=pyoenv.NonNegativeReals,initialize =300)
 
-        # Create objective
+#-------# Create objective
         def obj_rule(model):
-                # pressureVector     = np.array([self.model.pressure[i].value for i in self.model.node_set])
-            dummy = [((self.model.pressure[i]- self.model.pressure[j] - self.bond_data.ix[(i,j),'dropCoeff']*self.model.flow[(i,j)]**2) if not self.bond_data.ix[(i,j),'Fan'] else 0) for (i,j) in self.model.bond_set]
-            # print ([((self.model.pressure[i].value- self.model.pressure[j].value) if not self.bond_data.ix[(i,j),'Fan'] else 0) for (i,j) in self.model.bond_set])
-            # print ([((self.bond_data.ix[(i,j),'dropCoeff']*self.model.flow[(i,j)].value**2) if not self.bond_data.ix[(i,j),'Fan'] else 0) for (i,j) in self.model.bond_set])
-            # print ([((self.model.pressure[i].value- self.model.pressure[j].value - self.bond_data.ix[(i,j),'dropCoeff']*self.model.flow[(i,j)].value**2) if not self.bond_data.ix[(i,j),'Fan'] else 0) for (i,j) in self.model.bond_set])
-            return(sum(np.square(dummy)))
+            cP = 10
+            pressureEq = [((self.model.pressure[i] - self.model.pressure[j]
+                          - self.bond_data.ix[(i,j),'dropCoeff'] * self.model.flow[(i,j)]**2)
+                          if not self.bond_data.ix[(i,j),'Fan'] else 0)
+                          for (i,j) in self.model.bond_set]
+
+            heatEq = []
+            for i in self.model.node_set:
+                if self.node_data.ix[i,'Exterior']:
+                    print('exterior', i)
+                    heatEq += [self.model.temper[i] - self.node_data.ix[i,'tempExt']]
+                else:
+                    heatFrom = 0
+                    heatTo   = 0
+                    for j in self.model.node_set:
+                        if (i,j) in self.model.bond_set and self.model.flow[(i,j)].value > 0:
+                            print('from', (i,j),self.model.flow[(i,j)].value)
+                            heatFrom += self.model.temper[i] * self.model.flow[(i,j)]
+                        if (j,i) in self.model.bond_set and self.model.flow[(j,i)].value > 0:
+                            print('to',(j,i) ,self.model.flow[(j,i)].value)
+                            heatTo   += self.model.temper[j] * self.model.flow[(j,i)]
+
+                    heatEq += [heatTo - heatFrom]
+            totalEq = pressureEq + heatEq
+            return(sum(np.square(totalEq)))
         self.model.OBJ = pyoenv.Objective(rule=obj_rule, sense=pyoenv.minimize)
 
-        # Flow Ballance rule
+#-------# Flow Ballance rule
         def flow_bal_rule(model, n):
             bonds = self.bond_data.reset_index()
             preds = bonds[ bonds.End == n ]['Start']
             succs = bonds[ bonds.Start == n ]['End']
             return sum(model.flow[(p,n)] for p in preds) + model.exterior[n] == sum(model.flow[(n,s)] for s in succs)
         self.model.FlowBal = pyoenv.Constraint(self.model.node_set, rule=flow_bal_rule)
-        # Upper forced rule
+#-------# Upper forced rule
         def upper_forced_rule(model, n1, n2):
             e = (n1,n2)
             if self.bond_data.ix[e, 'maxForced'] < 0:
@@ -83,7 +90,7 @@ class MinCostFlow:
                 return pyoenv.Constraint.Skip
             return model.flow[e] >= self.bond_data.ix[e, 'minForced']
         self.model.LowerForced = pyoenv.Constraint(self.model.bond_set, rule=lower_forced_rule)
-        # Upper exterior rule
+#-------# Upper exterior rule
         def upper_exterior_rule(model, n):
             # if self.node_data.ix[n, 'maxExterior'] < 0:
             #     return pyoenv.Constraint.Skip
@@ -95,7 +102,7 @@ class MinCostFlow:
             #     return pyoenv.Constraint.Skip
             return model.exterior[n] >= self.node_data.ix[n, 'minExterior']
         self.model.LowerExterior = pyoenv.Constraint(self.model.node_set, rule=lower_exterior_rule)
-        # Upper pressure rule
+#-------# Upper pressure rule
         def upper_pressure_rule(model, n):
             if self.node_data.ix[n, 'maxP'] < 0:
                 return pyoenv.Constraint.Skip
@@ -107,10 +114,22 @@ class MinCostFlow:
                 return pyoenv.Constraint.Skip
             return model.pressure[n] >= self.node_data.ix[n, 'minP']
         self.model.LowerPressure = pyoenv.Constraint(self.model.node_set, rule=lower_pressure_rule)
+#-------# Upper Temperature rule
+        def upper_temp_rule(model, n):
+            if self.node_data.ix[n, 'maxT'] < 0:
+                return pyoenv.Constraint.Skip
+            return model.temper[n] <= self.node_data.ix[n, 'maxT']
+        self.model.UpperTemp = pyoenv.Constraint(self.model.node_set, rule=upper_temp_rule)
+        # Lower Temperature rule
+        def lower_temp_rule(model, n):
+            if self.node_data.ix[n, 'minT'] < 0:
+                return pyoenv.Constraint.Skip
+            return model.temper[n] >= self.node_data.ix[n, 'minT']
+        self.model.LowerTemp = pyoenv.Constraint(self.model.node_set, rule=lower_temp_rule)
     def solve(self):
         """Solve the model."""
         solver = pyomo.opt.SolverFactory('ipopt')
-        results = solver.solve(self.model, tee=True, keepfiles=False )#, options_string="mip_tolerances_integrality=1e-9 mip_tolerances_mipgap=0")
+        results = solver.solve(self.model, tee=False, keepfiles=False )#, options_string="mip_tolerances_integrality=1e-9 mip_tolerances_mipgap=0")
 
         if (results.solver.status != pyomo.opt.SolverStatus.ok):
             logging.warning('Check solver not ok?')
@@ -119,26 +138,30 @@ class MinCostFlow:
         flowList     = [self.model.flow[i].value for i in self.model.flow]
         externalList = [self.model.exterior[i].value for i in self.model.exterior]
         pressureList = [self.model.pressure[i].value for i in self.model.pressure]
-        print(flowList)
 
     def printInfo(self):
         print( '\n\n---------------------------')
         print( 'Convergence: ', self.model.OBJ())
         print("Print values for each variable explicitly")
-        s = ' %-20s  %-5.2f'
+        s = ' %-50s  %-5.2f'
 
         print('\n %-50s  %-5s' % ('Bond', 'Flow'))
         for i in self.model.flow:
             print(s % (i, self.model.flow[i].value))
 
-        print('\n %-20s  %-5s' % ('Node', 'Exterior'))
+        print('\n %-50s  %-5s' % ('Node', 'Exterior'))
         for i in self.model.exterior:
             print(s % (i,self.model.exterior[i].value))
 
-        print('\n %-20s  %-5s' % ('Node', 'Exterior'))
+        print('\n %-50s  %-5s' % ('Node', 'Pressure'))
         for i in self.model.exterior:
             print(s %(i,self.model.pressure[i].value))
+
+        print('\n %-50s  %-5s' % ('Node', 'Temperature'))
+        for i in self.model.temper:
+            print(s %(i,self.model.temper[i].value))
+
 if __name__ == '__main__':
-       sp = MinCostFlow('nodes.csv', 'bonds.csv')
+       sp = FlowBalance('nodes.csv', 'bonds.csv')
        sp.solve()
-    #    sp.printInfo()
+       sp.printInfo()
