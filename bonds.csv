@@ -1,13 +1,13 @@
-Start,End,dropCoeff,minForced,maxForced,Fan
-Air treatment system,Tower top,1,0,100,FALSE
-Tower top,Tower leakage exterior,2,0,100,FALSE
-Tower top,Converter inlet,0,2,2,TRUE
-Tower top,Transformer inlet,0,2,2,TRUE
-Tower top,Switchgear inlet,0,2,2,TRUE
-Converter inlet,Converter platform,1,0,100,FALSE
-Transformer inlet,Transformer platform,1,0,100,FALSE
-Switchgear inlet,Switchgear platform,1,0,100,FALSE
-Converter platform,Transformer platform,1,0,100,FALSE
-Transformer platform,Switchgear platform,1,0,100,FALSE
-Switchgear platform,Tower middle,1,0,100,FALSE
-Tower middle,Tower top,1,0,100,FALSE
+Start,End,dropCoeff,fan,heatFlow,forced
+Air treatment system,Tower top,1,FALSE,50000,0
+Converter inlet,Converter platform,1,FALSE,0,0
+Converter platform,Transformer platform,1,FALSE,0,0
+Switchgear inlet,Switchgear platform,1,FALSE,0,0
+Switchgear platform,Tower middle,1,FALSE,0,0
+Tower middle,Tower top,1,FALSE,0,0
+Tower top,Converter inlet,0,TRUE,0,2
+Tower top,Switchgear inlet,0,TRUE,0,2
+Tower top,Tower leakage exterior,2,FALSE,0,0
+Tower top,Transformer inlet,0,TRUE,0,2
+Transformer inlet,Transformer platform,1,FALSE,0,0
+Transformer platform,Switchgear platform,1,FALSE,0,0

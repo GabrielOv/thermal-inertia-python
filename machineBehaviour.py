@@ -8,6 +8,7 @@ import pandas
 import pyomo.opt
 import pyomo.environ as pyoenv
 
+from graphBondModel import air_volume_GBM
 from thermal_inertia_tools import *
 import config
 
@@ -21,14 +22,16 @@ def counted(fn):
 
 # Object that represents the wind turbine generator an a certain time
 class machineState(object):
-    # self.air_volume_GBM = air_volume_GBM('nodes.csv', 'bonds.csv')
+    # GBM = air_volume_GBM('nodes.csv', 'bonds.csv')
     # self.machineTimeStep       = counter(machineTimeStep)
     def __init__(self,T_0):
+        # machineState.GBM.solve()
         self.transformer = tr_component(T_0)
         self.converter   = cv_component(T_0)
         self.generator   = gn_component(T_0)
         self.gearbox     = gb_component(T_0)
         self.nacelle     = nac_component(T_0)
+        # self.air_component=air_component()
         self.power       = 0
         self.potential   = 0
         self.PF          = 1
@@ -52,8 +55,14 @@ class machineState(object):
         newTime.generator.timeStep(newTime.converter.powerIN,Tamb)                  # Calculate GENERATOR
         newTime.gearbox.timeStep(newTime.generator.powerIN,Tamb)                    # Calculate GEARBOX
         newTime.nacelle.timeStep(newTime.generator.losses*(1-newTime.generator.split),newTime.gearbox.losses*(1-newTime.gearbox.split),Tamb)
-        # newTime.air_volume_GBM.solve()
-        # newTime.ain_volume.dump_GBM_to_store()
+        # if  machineState.machineTimeStep.called % 100 == 0:
+        #     [heatFlow_v,forced_v] = self.buildUpdateVectors()
+        #     machineState.GBM.updateHeatFlows(heatFlow_v)
+        #     # machineState.GMB.updateFanFlows(forced_v)
+        #     machineState.GBM.solve()
+        #     machineState.GBM.printInfo()
+        #     print('crank')
+            # GBM_instance.dump_GBM_to_store()
 
         return newTime
     # Returns interpolation of power produtcion given a  wind speed
@@ -93,9 +102,14 @@ class machineState(object):
         self.generator.waterCold_tempLimit = 10000
         self.gearbox.oilCold_tempLimit     = 10000
         self.nacelle.airCold_Limit         = 10000
+    # Builds vectors to feed the graphBondModel updats
+    def buildUpdateVectors(self):
+        heatFlow_v = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        forced_v   = [0, 0, 0, 0, 0, 0, 2, 2, 0, 2, 0, 0]
+        return [heatFlow_v,forced_v]
 # Object which holds the behaviour parameters and the variables that define the state of a TRANSFORMER
 class tr_component(object):
-    solid_oil_trans    = 5.333   #[kW/K] Winddings ---> Oil bath
+    solid_oil_trans    = 5.333   #[kW/K] Winddings ---> Oilº bath
     oil_water_trans    = 2.491   #[kW/K] Oil Water Heat Exchager
     solid_int          = 4370    #[kJ/K] Thermal inertia for the solid parts
     oil_int            = 8650    #[kJ/K] Thermal inertia for the oil bath
@@ -413,8 +427,8 @@ class nac_component(object):
     # Function to chooses the cooling mode as a function of waterCold temperature. Presents hysteresis and a certain lag to avoid constant switching
     def exchCoeffFunc(self):
         self.exchLag  -= 1
-        limitsUp=  [ 0, 29, 32, 35, 39]
-        limitsDown=[ 0, 27, 30, 33, 36]
+        limitsUp=  [ 0, 30, 33, 36, 40]
+        limitsDown=[ 0, 28, 31, 34, 37]
         if self.airMiddle > limitsUp[self.exchMode]:
             for i in range(self.exchMode,len(limitsUp)):
                 if self.airMiddle > limitsUp[i]:
@@ -447,131 +461,16 @@ class nac_component(object):
         self.airHot     = self.airCold   + self.componentsIn / self.airC
         self.alarmFunc()
 # Object which holds the behaviour parameters and the variables that define the state of a AIRMASS in tower and NACELLE
-class air_volume(object):
-    def __init__(self, nodesfile, bondsfile):
-        self.someVariables = 0
-class air_volume_GBM(object):
-    # cover_trans        = [0.1, 0.25, 0.5, 1, 1.5]  #[kW/K]
-    def __init__(self, nodesfile, bondsfile):
-        """Read in the csv data."""
-        # Read in the nodes file
-        self.node_data = pandas.read_csv(nodesfile)
-        self.node_data.set_index(['Node'], inplace=True)
-        self.node_data.sort_index(inplace=True)
-        # Read in the bonds file
-        self.bond_data = pandas.read_csv(bondsfile)
-        self.bond_data.set_index(['Start','End'], inplace=True)
-        self.bond_data.sort_index(inplace=True)
-
-        self.node_set = self.node_data.index.unique()
-        self.bond_set = self.bond_data.index.unique()
-
-        self.createModel()
-
-    def createModel(self):
-        """Create the pyomo model given the csv data."""
-        self.model = pyoenv.ConcreteModel()
-
-        # Create sets
-
-        self.model.node_set = pyoenv.Set( ordered=True, initialize=self.node_set )
-        self.model.bond_set = pyoenv.Set( ordered=True, initialize=self.bond_set , dimen=2)
-
-        # Create variables
-        self.model.flow     = pyoenv.Var(self.model.bond_set,
-                                         domain=pyoenv.NonNegativeReals,initialize =1)
-
-
-        self.model.pressure = pyoenv.Var(self.model.node_set,
-                                         domain=pyoenv.NonNegativeReals,initialize =1)
-
-
-        self.model.exterior = pyoenv.Var(self.model.node_set,
-                                         domain=pyoenv.Reals,initialize =1)
-
-        self.temperature    = pyoenv.Var(self.model.node_set,
-                                         domain=pyoenv.Reals,initialize =1)
-
-
-        # Create objective
-        def obj_rule(model):
-            dummy = [((self.model.pressure[i]- self.model.pressure[j] - self.bond_data.ix[(i,j),'dropCoeff']*self.model.flow[(i,j)]**2) if not self.bond_data.ix[(i,j),'Fan'] else 0) for (i,j) in self.model.bond_set]
-            return(sum(np.square(dummy)))
-
-        self.model.OBJ = pyoenv.Objective(rule=obj_rule, sense=pyoenv.minimize)
-
-        # Flow Ballance rule
-        def flow_bal_rule(model, n):
-            bonds = self.bond_data.reset_index()
-            preds = bonds[ bonds.End == n ]['Start']
-            succs = bonds[ bonds.Start == n ]['End']
-            return sum(model.flow[(p,n)] for p in preds) + model.exterior[n] == sum(model.flow[(n,s)] for s in succs)
-        self.model.FlowBal = pyoenv.Constraint(self.model.node_set, rule=flow_bal_rule)
-        # Upper forced rule
-        def upper_forced_rule(model, n1, n2):
-            e = (n1,n2)
-            if self.bond_data.ix[e, 'maxForced'] < 0:
-                return pyoenv.Constraint.Skip
-            return model.flow[e] <= self.bond_data.ix[e, 'maxForced']
-        self.model.UpperForced = pyoenv.Constraint(self.model.bond_set, rule=upper_forced_rule)
-        # Lower forced rule
-        def lower_forced_rule(model, n1, n2):
-            e = (n1,n2)
-            if self.bond_data.ix[e, 'minForced'] < 0:
-                return pyoenv.Constraint.Skip
-            return model.flow[e] >= self.bond_data.ix[e, 'minForced']
-        self.model.LowerForced = pyoenv.Constraint(self.model.bond_set, rule=lower_forced_rule)
-        # Upper exterior rule
-        def upper_exterior_rule(model, n):
-            # if self.node_data.ix[n, 'maxExterior'] < 0:
-            #     return pyoenv.Constraint.Skip
-            return model.exterior[n] <= self.node_data.ix[n, 'maxExterior']
-        self.model.UpperExterior = pyoenv.Constraint(self.model.node_set, rule=upper_exterior_rule)
-        # Lower exterior rule
-        def lower_exterior_rule(model, n):
-            # if self.node_data.ix[n, 'minExterior'] < 0:
-            #     return pyoenv.Constraint.Skip
-            return model.exterior[n] >= self.node_data.ix[n, 'minExterior']
-        self.model.LowerExterior = pyoenv.Constraint(self.model.node_set, rule=lower_exterior_rule)
-        # Upper pressure rule
-        def upper_pressure_rule(model, n):
-            if self.node_data.ix[n, 'maxP'] < 0:
-                return pyoenv.Constraint.Skip
-            return model.pressure[n] <= self.node_data.ix[n, 'maxP']
-        self.model.UpperPressure = pyoenv.Constraint(self.model.node_set, rule=upper_pressure_rule)
-        # Lower pressure rule
-        def lower_pressure_rule(model, n):
-            if self.node_data.ix[n, 'minP'] < 0:
-                return pyoenv.Constraint.Skip
-            return model.pressure[n] >= self.node_data.ix[n, 'minP']
-        self.model.LowerPressure = pyoenv.Constraint(self.model.node_set, rule=lower_pressure_rule)
-    def solve(self):
-        """Solve the model."""
-        solver = pyomo.opt.SolverFactory('ipopt')
-        results = solver.solve(self.model, tee=False, keepfiles=False )#, options_string="mip_tolerances_integrality=1e-9 mip_tolerances_mipgap=0")
-
-        if (results.solver.status != pyomo.opt.SolverStatus.ok):
-            logging.warning('Check solver not ok?')
-        if (results.solver.termination_condition != pyomo.opt.TerminationCondition.optimal):
-            logging.warning('Check solver optimality?')
-        flowList     = [self.model.flow[i].value for i in self.model.flow]
-        externalList = [self.model.exterior[i].value for i in self.model.exterior]
-        pressureList = [self.model.pressure[i].value for i in self.model.pressure]
-        print(flowList)
-    def printInfo(self):
-        print( '\n\n---------------------------')
-        print( 'Convergence: ', self.model.OBJ())
-        print("Print values for each variable explicitly")
-        s = ' %-50s  %-5.2f'
-
-        print('\n %-50s  %-5s' % ('Bond', 'Flow'))
-        for i in self.model.flow:
-            print(s % (i, self.model.flow[i].value))
-
-        print('\n %-50s  %-5s' % ('Node', 'Exterior'))
-        for i in self.model.exterior:
-            print(s % (i,self.model.exterior[i].value))
-
-        print('\n %-50s  %-5s' % ('Node', 'Exterior'))
-        for i in self.model.exterior:
-            print(s %(i,self.model.pressure[i].value))
+class air_component(object):
+    def __init__(self):
+        self.flowVector         = [machineState.GBM.model.flow[i].value for i in machineState.GBM.model.bond_set]
+        self.pressureVector     = [machineState.GBM.model.pressure[i].value for i in machineState.GBM.model.node_set]
+        self.externalFlowVector = [machineState.GBM.model.exterior[i].value for i in machineState.GBM.model.node_set]
+        self.temperatureVector  = [machineState.GBM.model.temper[i].value for i in machineState.GBM.model.node_set]
+        # self.heatFlowVector     = [machineState.GBM.bond_data.heatFlow[i].value for i in machineState.GBM.model.bond_set]
+        # self.heatDeltaVector    = [machineState.GBM.model.flow[i].value for i in machineState.GBM.model.bond_set]
+    def dump_GBM_to_store(self):
+        self.flowVector         = [machineState.GBM.model.flow[i].value for i in machineState.GBM.model.bond_set]
+        self.pressureVector     = [machineState.GBM.model.pressure[i].value for i in machineState.GBM.model.node_set]
+        self.externalFlowVector = [machineState.GBM.model.exterior[i].value for i in machineState.GBM.model.node_set]
+        self.temperatureVector  = [machineState.GBM.model.temper[i].value for i in machineState.GBM.model.node_set]

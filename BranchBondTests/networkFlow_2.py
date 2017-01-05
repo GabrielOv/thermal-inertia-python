@@ -1,3 +1,4 @@
+import time
 import pyomo
 import pandas
 import pyomo.opt
@@ -21,6 +22,23 @@ class FlowBalance:
         self.bond_set = self.bond_data.index.unique()
 
         self.createModel()
+
+    def updateParameters(self,dropCoeff_v,fan_v,heatFlow_v,forced_v):
+
+        self.bond_data['dropCoeff'] = dropCoeff_v
+        self.bond_data['fan']       = fan_v
+        self.bond_data['heatFlow']  = heatFlow_v
+        self.bond_data['forced']    = forced_v
+
+        return self.bond_data
+
+
+    def getHeatFlowStructure(self):
+
+
+
+        return self.bond_data.ix[bond,'heatFlow']
+
     def createModel(self):
         """Create the pyomo model given the csv data."""
         self.model = pyoenv.ConcreteModel()
@@ -38,58 +56,22 @@ class FlowBalance:
         self.model.exterior = pyoenv.Var(self.model.node_set,
                                          domain=pyoenv.Reals,initialize =1)
         self.model.temper   = pyoenv.Var(self.model.node_set,
-                                          domain=pyoenv.NonNegativeReals,initialize =300)
-
-#-------# Create objective
-        def obj_rule(model):
-            cP = 10
-            pressureEq = [((self.model.pressure[i] - self.model.pressure[j]
-                          - self.bond_data.ix[(i,j),'dropCoeff'] * self.model.flow[(i,j)]**2)
-                          if not self.bond_data.ix[(i,j),'Fan'] else 0)
-                          for (i,j) in self.model.bond_set]
-
-            heatEq = []
-            for i in self.model.node_set:
-                if self.node_data.ix[i,'Exterior']:
-                    print('exterior', i)
-                    heatEq += [self.model.temper[i] - self.node_data.ix[i,'tempExt']]
-                else:
-                    heatFrom = 0
-                    heatTo   = 0
-                    for j in self.model.node_set:
-                        if (i,j) in self.model.bond_set and self.model.flow[(i,j)].value > 0:
-                            print('from', (i,j),self.model.flow[(i,j)].value)
-                            heatFrom += self.model.temper[i] * self.model.flow[(i,j)]
-                        if (j,i) in self.model.bond_set and self.model.flow[(j,i)].value > 0:
-                            print('to',(j,i) ,self.model.flow[(j,i)].value)
-                            heatTo   += self.model.temper[j] * self.model.flow[(j,i)]
-
-                    heatEq += [heatTo - heatFrom]
-            totalEq = pressureEq + heatEq
-            return(sum(np.square(totalEq)))
-        self.model.OBJ = pyoenv.Objective(rule=obj_rule, sense=pyoenv.minimize)
-
-#-------# Flow Ballance rule
+                                          domain=pyoenv.NonNegativeReals,initialize =298)
+#-------# Flow Ballance ruleforced
         def flow_bal_rule(model, n):
             bonds = self.bond_data.reset_index()
             preds = bonds[ bonds.End == n ]['Start']
             succs = bonds[ bonds.Start == n ]['End']
             return sum(model.flow[(p,n)] for p in preds) + model.exterior[n] == sum(model.flow[(n,s)] for s in succs)
         self.model.FlowBal = pyoenv.Constraint(self.model.node_set, rule=flow_bal_rule)
-#-------# Upper forced rule
-        def upper_forced_rule(model, n1, n2):
+#-------# Forced rule
+        def forced_rule(model, n1, n2):
             e = (n1,n2)
-            if self.bond_data.ix[e, 'maxForced'] < 0:
+            if not self.bond_data.ix[e, 'fan']:
                 return pyoenv.Constraint.Skip
-            return model.flow[e] <= self.bond_data.ix[e, 'maxForced']
-        self.model.UpperForced = pyoenv.Constraint(self.model.bond_set, rule=upper_forced_rule)
-        # Lower forced rule
-        def lower_forced_rule(model, n1, n2):
-            e = (n1,n2)
-            if self.bond_data.ix[e, 'minForced'] < 0:
-                return pyoenv.Constraint.Skip
-            return model.flow[e] >= self.bond_data.ix[e, 'minForced']
-        self.model.LowerForced = pyoenv.Constraint(self.model.bond_set, rule=lower_forced_rule)
+            return model.flow[e] == self.bond_data.ix[e, 'forced']
+        self.model.Forced = pyoenv.Constraint(self.model.bond_set, rule=forced_rule)
+
 #-------# Upper exterior rule
         def upper_exterior_rule(model, n):
             # if self.node_data.ix[n, 'maxExterior'] < 0:
@@ -126,18 +108,52 @@ class FlowBalance:
                 return pyoenv.Constraint.Skip
             return model.temper[n] >= self.node_data.ix[n, 'minT']
         self.model.LowerTemp = pyoenv.Constraint(self.model.node_set, rule=lower_temp_rule)
+#-------# Create objective
+        def obj_rule(model):
+            cP = 1000
+            pressureEq = [((self.model.pressure[i] - self.model.pressure[j]
+                          - self.bond_data.ix[(i,j),'dropCoeff'] * self.model.flow[(i,j)]**2)
+                          if not self.bond_data.ix[(i,j),'fan'] else 0)
+                          for (i,j) in self.model.bond_set]
+            heatEq = []
+            for n in self.model.node_set:
+                bonds = self.bond_data.reset_index()
+                preds = bonds[ bonds.End == n ]['Start']
+                succs = bonds[ bonds.Start == n ]['End']
+
+                nexterm = 0
+                if self.node_data.ix[n ,'inlet']:
+                    nextTerm  = cP * model.exterior[n]*self.node_data.ix[n ,'tempExt']
+                if self.node_data.ix[n ,'outlet']:
+                    nextTerm  = cP * model.exterior[n]*model.temper[n]
+
+                nextTerm += ( cP * sum(model.flow[(p,n)]*model.temper[p]   for p in preds)
+                            +      sum(self.bond_data.ix[(p,n),'heatFlow'] for p in preds)
+                            - cP * sum(model.flow[(n,s)]*model.temper[n]   for s in succs))
+                # print([self.bond_data.ix[(p,n),'heatFlow'] for p in preds])
+
+                heatEq.append(nextTerm)
+
+            totalEq = pressureEq + heatEq
+
+            return(sum(np.square(totalEq)))
+        self.model.OBJ = pyoenv.Objective(rule=obj_rule, sense=pyoenv.minimize)
+
+
     def solve(self):
+
         """Solve the model."""
         solver = pyomo.opt.SolverFactory('ipopt')
-        results = solver.solve(self.model, tee=False, keepfiles=False )#, options_string="mip_tolerances_integrality=1e-9 mip_tolerances_mipgap=0")
+        instance = self.model.create_instance()
+        results = solver.solve(instance, tee=True, keepfiles=False )#, options_string="mip_tolerances_integrality=1e-9 mip_tolerances_mipgap=0")
 
         if (results.solver.status != pyomo.opt.SolverStatus.ok):
             logging.warning('Check solver not ok?')
         if (results.solver.termination_condition != pyomo.opt.TerminationCondition.optimal):
             logging.warning('Check solver optimality?')
-        flowList     = [self.model.flow[i].value for i in self.model.flow]
-        externalList = [self.model.exterior[i].value for i in self.model.exterior]
-        pressureList = [self.model.pressure[i].value for i in self.model.pressure]
+        # flowList     = [self.model.flow[i].value     for i in self.model.flow]
+        # externalList = [self.model.exterior[i].value for i in self.model.exterior]
+        # pressureList = [self.model.pressure[i].value for i in self.model.pressure]
 
     def printInfo(self):
         print( '\n\n---------------------------')
@@ -162,6 +178,8 @@ class FlowBalance:
             print(s %(i,self.model.temper[i].value))
 
 if __name__ == '__main__':
+       calc_begining_time          = time.time()
        sp = FlowBalance('nodes.csv', 'bonds.csv')
        sp.solve()
-       sp.printInfo()
+       print('Calculation took     :   %f seconds'  % ( time.time() - calc_begining_time))
+       

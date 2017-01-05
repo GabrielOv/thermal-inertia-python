@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import time
 import config
 
@@ -7,7 +9,7 @@ from machineBehaviour      import *
 
 print( "Loading data series, power curve and starting conditions")
 start_time                = time.time()
-timeToSimulate            = datetime.timedelta(days = 100)             # For how loong should the simulation run
+timeToSimulate            = datetime.timedelta(days = 600)             # For how loong should the simulation run
 config.powerCurve         = loadPowerCurve(9000)                       # Load a power curve limmeiting at the max power
 [winds, temperatures]     = loadWindTemperatureSeries(testing = False) # Load wind and temperature time series
 [powerFactor,gridVoltage] = [0.9, 0.9]                                 # Default Grid conditions, they might be modified because of derating

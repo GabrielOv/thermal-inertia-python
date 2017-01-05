@@ -1,11 +1,11 @@
-Node,minExterior,maxExterior,minP,maxP,minT,maxT,tempExt,Exterior
-Air treatment system,10,10,0,1500,250,350,298,TRUE
-Tower leakage exterior,-100,100,500,500,250,350,0,FALSE
-Converter inlet,0,0,0,1500,250,350,0,FALSE
-Transformer inlet,0,0,0,1500,250,350,0,FALSE
-Switchgear inlet,0,0,0,1500,250,350,0,FALSE
-Converter platform,0,0,0,1500,250,350,0,FALSE
-Transformer platform,0,0,0,1500,250,350,0,FALSE
-Switchgear platform,0,0,0,1500,250,350,0,FALSE
-Tower middle,0,0,0,1500,250,350,0,FALSE
-Tower top,0,0,0,1500,250,350,0,FALSE
+Node,minExterior,maxExterior,minP,maxP,minT,maxT,tempExt,inlet,outlet
+Air treatment system,10,10,0,1500,250,350,300,TRUE,FALSE
+Converter inlet,0,0,0,1500,250,350,298,FALSE,FALSE
+Converter platform,0,0,0,1500,250,350,298,FALSE,FALSE
+Switchgear inlet,0,0,0,1500,250,350,298,FALSE,FALSE
+Switchgear platform,0,0,0,1500,250,350,298,FALSE,FALSE
+Tower leakage exterior,-100,-1,500,500,250,350,298,FALSE,TRUE
+Tower middle,0,0,0,1500,250,350,298,FALSE,FALSE
+Tower top,0,0,0,1500,250,350,298,FALSE,FALSE
+Transformer inlet,0,0,0,1500,250,350,298,FALSE,FALSE
+Transformer platform,0,0,0,1500,250,350,298,FALSE,FALSE

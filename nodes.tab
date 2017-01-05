@@ -1,0 +1,17 @@
+node_set                minExterior    maxExterior  minP    maxP    minT    maxT    tempExt     inlet    outlet airmass tempPre
+Air_treatment_system    0.807           0.807       0       1500    -50     100     25          TRUE     FALSE  100     25
+Converter_inlet         0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Converter_platform      0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Switchgear_inlet        0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Switchgear_platform     0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Tower_leakage_exterior  -100            0           100     100     -50     100     25          FALSE    TRUE   100     25
+Tower_middle            0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Tower_top               0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Transformer_inlet       0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Transformer_platform    0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Nacelle_bottom_front    0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Nacelle_bottom_rear     0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Nacelle_top_front       0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Nacelle_top_rear        0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Hub                     0               0           0       1500    -50     100     25          FALSE    FALSE  100     25
+Hub_leakage_exterior    -100            0           100     100     -50     100     25          FALSE    TRUE   100     25
