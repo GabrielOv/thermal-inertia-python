@@ -4,12 +4,29 @@ import pyomo.opt
 import pyomo.environ as pyoenv
 import numpy as np
 
+import config
+
 class air_volume_GBM:
 
 
     def __init__(self):
-        self.dt = 10
+        self.dt = config.dt
         self.createModel()
+        # self.air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
+        # self.airC               = 10      #[kW/K] Heat carryng capacity of the water current
+        self.airCold_Limit      = 38
+        self.exchCoeffs         = [0.001, 1, 1.5, 2, 2.556]
+        self.cover_trans        = [0.001, 0.25, 0.5, 1, 1.5]  #[kW/K]
+
+        self.coverOut      = 0
+        self.componentsIn  = 0
+        self.exchOut       = 0
+        self.alarm         = False
+        self.exchMode      = 0
+        self.exchLag       = 0
+
+        self.towerMode     = 0
+        self.towerLag      = 0
 
     def createModel(self):
         self.model = pyoenv.AbstractModel()
@@ -17,8 +34,8 @@ class air_volume_GBM:
         self.model.node_set = pyoenv.Set(ordered = True,dimen=1)
         self.model.bond_set = pyoenv.Set(ordered = True,dimen=2)
         # Create parameters
-        self.model.maxExterior = pyoenv.Param(self.model.node_set)
-        self.model.minExterior = pyoenv.Param(self.model.node_set)
+        self.model.maxExterior = pyoenv.Param(self.model.node_set, mutable= True)
+        self.model.minExterior = pyoenv.Param(self.model.node_set, mutable= True)
         self.model.maxP        = pyoenv.Param(self.model.node_set)
         self.model.minP        = pyoenv.Param(self.model.node_set)
         self.model.maxT        = pyoenv.Param(self.model.node_set)
@@ -131,60 +148,107 @@ class air_volume_GBM:
 
         self.instance = self.model.create_instance(data)
 
-    def updatHeatFlows(self):
-        self.instance.heatFlow[('Air_treatment_system', 'Tower_top')]           = self.airTreatmentHeat()
-        self.instance.heatFlow[('Converter_inlet', 'Converter_platform')]       = self.converterPlatformHeat()
-        self.instance.heatFlow[('Converter_platform', 'Tower_middle')]          = self.towerUpHeat_3()
-        self.instance.heatFlow[('Switchgear_inlet', 'Switchgear_platform')]     = self.switchgearPlatformHeat()
-        self.instance.heatFlow[('Switchgear_platform', 'Transformer_platform')] = self.towerUpHeat_1()
-        self.instance.heatFlow[('Tower_middle', 'Tower_top')]                   = self.towerUpHeat_4()
+    def updateAirFlows(self,machineState):
+        self.instance.minExterior['Air_treatment_system']                 = self.airTreatmentInFlow(machineState)
+        self.instance.maxExterior['Air_treatment_system']                 = self.instance.minExterior['Air_treatment_system']
+        self.instance.forced[('Tower_top', 'Converter_inlet')]            = self.converterPlatformFlow(machineState)
+        self.instance.forced[('Tower_top', 'Switchgear_inlet')]           = self.switchgearPlatformFlow(machineState)
+        self.instance.forced[('Tower_top', 'Transformer_inlet')]          = self.transformerPlatformFlow(machineState)
+        self.instance.forced[('Nacelle_top_rear', 'Nacelle_bottom_rear')] = self.nacelleCoolingFlow(machineState)
+
+
+    def updateHeatFlows(self,machineState):
+        self.instance.heatFlow[('Air_treatment_system', 'Tower_top')]           = self.airTreatmentHeat(machineState)
+        self.instance.heatFlow[('Converter_inlet', 'Converter_platform')]       = self.converterPlatformHeat(machineState)
+        self.instance.heatFlow[('Converter_platform', 'Tower_middle')]          = self.towerUpHeat_3(machineState)
+        self.instance.heatFlow[('Switchgear_inlet', 'Switchgear_platform')]     = self.switchgearPlatformHeat(machineState)
+        self.instance.heatFlow[('Switchgear_platform', 'Transformer_platform')] = self.towerUpHeat_1(machineState)
+        self.instance.heatFlow[('Tower_middle', 'Tower_top')]                   = self.towerUpHeat_4(machineState)
         self.instance.heatFlow[('Tower_top', 'Converter_inlet')]                = 0
         self.instance.heatFlow[('Tower_top', 'Switchgear_inlet')]               = 0
         self.instance.heatFlow[('Tower_top', 'Tower_leakage_exterior')]         = 0
         self.instance.heatFlow[('Tower_top', 'Transformer_inlet')]              = 0
-        self.instance.heatFlow[('Transformer_inlet', 'Transformer_platform')]   = self.transformerPlatformHeat()
-        self.instance.heatFlow[('Transformer_platform', 'Converter_platform')]  = self.towerUpHeat_2()
+        self.instance.heatFlow[('Transformer_inlet', 'Transformer_platform')]   = self.transformerPlatformHeat(machineState)
+        self.instance.heatFlow[('Transformer_platform', 'Converter_platform')]  = self.towerUpHeat_2(machineState)
         self.instance.heatFlow[('Tower_top', 'Nacelle_bottom_front')]           = 0
-        self.instance.heatFlow[('Nacelle_bottom_rear', 'Nacelle_bottom_front')] = self.driveTrainHeatLower()
-        self.instance.heatFlow[('Nacelle_bottom_front', 'Nacelle_top_front')]   = self.driveTrainHeatFront()
-        self.instance.heatFlow[('Nacelle_top_front', 'Nacelle_top_rear')]       = self.driveTrainHeatUpper()
-        self.instance.heatFlow[('Nacelle_top_rear', 'Nacelle_bottom_rear')]     = self.nacelleCooling()
-        self.instance.heatFlow[('Nacelle_bottom_rear', 'Nacelle_top_rear')]     = self.driveTrainHeatRear()
+        self.instance.heatFlow[('Nacelle_bottom_rear', 'Nacelle_bottom_front')] = self.driveTrainHeatLower(machineState)
+        self.instance.heatFlow[('Nacelle_bottom_front', 'Nacelle_top_front')]   = self.driveTrainHeatFront(machineState)
+        self.instance.heatFlow[('Nacelle_top_front', 'Nacelle_top_rear')]       = self.driveTrainHeatUpper(machineState)
+        self.instance.heatFlow[('Nacelle_top_rear', 'Nacelle_bottom_rear')]     = self.nacelleCooling(machineState)
+        self.instance.heatFlow[('Nacelle_bottom_rear', 'Nacelle_top_rear')]     = self.driveTrainHeatRear(machineState)
         self.instance.heatFlow[('Nacelle_top_front', 'Hub')]                    = 0
         self.instance.heatFlow[('Nacelle_bottom_front', 'Hub')]                 = 0
         self.instance.heatFlow[('Hub', 'Hub_leakage_exterior')]                 = 0
 
-    def airTreatmentHeat(self):
+    def airTreatmentHeat(self,machineState):
         return 1000
-    def converterPlatformHeat(self):
-        return 1000
-    def switchgearPlatformHeat(self):
-        return 1000
-    def transformerPlatformHeat(self):
-        return 1000
-    def driveTrainHeatLower(self):
-        return 1000
-    def driveTrainHeatFront(self):
-        return 1000
-    def driveTrainHeatUpper(self):
-        return 1000
-    def driveTrainHeatRear(self):
-        return 1000
-    def nacelleCooling(self):
-        return -1000
-    def towerUpHeat_1(self):
-        return -1000
-    def towerUpHeat_2(self):
-        return -1000
-    def towerUpHeat_3(self):
-        return -1000
-    def towerUpHeat_4(self):
-        return -1000
+    def converterPlatformHeat(self,machineState):
+        return machineState.converter.lossesAir*1000
+    def transformerPlatformHeat(self,machineState):
+        return machineState.transformer.lossesAir*1000
+    def switchgearPlatformHeat(self,machineState):
+        return 2000
+    def driveTrainHeatLower(self,machineState):
+        return 1000*(machineState.gearbox.lossesAir + machineState.generator.lossesAir)/5 +5000
+    def driveTrainHeatFront(self,machineState):
+        return 1000*(machineState.gearbox.lossesAir + machineState.generator.lossesAir)/5
+    def driveTrainHeatUpper(self,machineState):
+        return 1000*2*(machineState.gearbox.lossesAir + machineState.generator.lossesAir)/5
+    def driveTrainHeatRear(self,machineState):
+        return 1000*(machineState.gearbox.lossesAir + machineState.generator.lossesAir)/5
+    def nacelleCooling(self,machineState):
+        limitsUp=  [ 0, 30, 33, 36, 40]
+        limitsDown=[ 0, 28, 31, 34, 37]
+        airTemp = machineState.air_component.temperature['Nacelle_bottom_rear']
+        if airTemp > limitsUp[self.exchMode]:
+            for i in range(self.exchMode,len(limitsUp)):
+                if airTemp > limitsUp[i]:
+                    self.exchMode = i
+                    self.exchLag  = config.exchLag
+        elif (airTemp < limitsDown[self.exchMode]) & (self.exchLag<1) :
+            for i in range(self.exchMode,0,-1):
+                if self.airMiddle < limitsDown[i]:
+                    self.exchMode = i-1
+        airCold = machineState.air_component.temperature['Nacelle_bottom_rear']
+        if airCold > self.airCold_Limit:
+            self.alarm = True
+        else:
+            self.alarm = False
+        return -1000*(machineState.air_component.temperature['Nacelle_top_rear'] -machineState.Tamb)*self.exchCoeffs[self.exchMode]
+    def towerUpHeat_1(self,machineState):
+        return -1000*(machineState.air_component.temperature['Switchgear_platform']-machineState.Tamb)*2.5
+    def towerUpHeat_2(self,machineState):
+        return -1000*(machineState.air_component.temperature['Transformer_platform']-machineState.Tamb)*2.5
+    def towerUpHeat_3(self,machineState):
+        return -1000*(machineState.air_component.temperature['Converter_platform']-machineState.Tamb)*2.5
+    def towerUpHeat_4(self,machineState):
+        return -1000*(machineState.air_component.temperature['Tower_middle']-machineState.Tamb)*2.5
+    def airTreatmentInFlow(self,machineState):
+        return 0.807
+    def converterPlatformFlow(self,machineState):
+        return 1.72
+    def transformerPlatformFlow(self,machineState):
+        return 1.72
+    def switchgearPlatformFlow(self,machineState):
+        return 1.39
+    def nacelleCoolingFlow(self,machineState):
+        flowsSet = [ 0.5, 2.45, 4.9, 7.36, 9.81]
+        return flowsSet[self.exchMode]
 
     def advanceTemperatures(self):
         for node in self.instance.node_set:
                self.instance.tempPre[node]= self.instance.temper[node].value
-
+    def resultsToDictionary(self):
+        temperatureDict={}
+        for node in self.instance.node_set:
+            temperatureDict.update({node:self.instance.temper[node].value})
+        flowDict={}
+        heatDict={}
+        for bond in self.instance.bond_set:
+            flowDict.update({bond:self.instance.flow[bond].value})
+            heatDict.update({bond:self.instance.heatFlow[bond].value})
+        heatDict.update({'exchMode':self.exchMode})
+        return [temperatureDict,flowDict,heatDict]
     def printInfo(self):
         print( '\n\n---------------------------')
         print( 'Convergence: ', self.instance.OBJ())

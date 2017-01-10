@@ -19,6 +19,8 @@ def outputRequestedGraphs(stateSeries):
     graphGenerator(stateSeries)
     graphGearbox(stateSeries)
     graphNacelle(stateSeries)
+    graphTower(stateSeries)
+
 # Timeseries of wind and potential production given a certain power curve
 def windPowerGraphs(stateSeries):
 
@@ -471,75 +473,203 @@ def graphNacelle(stateSeries):
 
     nacelleReducedSeries = reduceNacellePoints(stateSeries)
 
-    nacGraph = [[item.nacelle.airHot         for item in nacelleReducedSeries],
-                 [item.nacelle.airMiddle     for item in nacelleReducedSeries],
-                 [item.nacelle.airCold       for item in nacelleReducedSeries],
-                 [item.nacelle.coverOut      for item in nacelleReducedSeries],
-                 [item.nacelle.componentsIn  for item in nacelleReducedSeries],
-                 [item.nacelle.exchOut       for item in nacelleReducedSeries],
-                 [item.Tamb                  for item in nacelleReducedSeries],
-                 [item.converter.airCold     for item in nacelleReducedSeries if item.nacelle.alarm]]
-    nacelleTimes = [item.time for item in stateSeries]
-    nacelleExcesTimes   = [item.time for item in stateSeries if item.nacelle.alarm]
+    nacGraph = [[item.air_component.temperature['Nacelle_top_rear']     for item in nacelleReducedSeries],
+                [item.air_component.temperature['Nacelle_top_front']    for item in nacelleReducedSeries],
+                [item.air_component.temperature['Nacelle_bottom_rear']  for item in nacelleReducedSeries],
+                [item.air_component.temperature['Nacelle_bottom_front']  for item in nacelleReducedSeries],
+                [(item.air_component.heatFlows[('Nacelle_bottom_rear','Nacelle_top_rear')]
+                 + item.air_component.heatFlows[('Nacelle_top_front','Nacelle_top_rear')]
+                 + item.air_component.heatFlows[('Nacelle_bottom_rear','Nacelle_bottom_front')]
+                 + item.air_component.heatFlows[('Nacelle_bottom_front','Nacelle_top_front')])/1000  for item in nacelleReducedSeries],
+                [-item.air_component.heatFlows[('Nacelle_top_rear','Nacelle_bottom_rear')]/1000  for item in nacelleReducedSeries],
+                [item.Tamb                  for item in nacelleReducedSeries],
+                [item.air_component.temperature['Hub']  for item in nacelleReducedSeries]]
+    nacelleTimes = [item.time for item in nacelleReducedSeries]
+    # nacelleExcesTimes   = [item.time for item in stateSeries if item.nacelle.alarm]
 
     traceNac = []
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[0],
-                               name = 'Air Hot T',
+                               name = 'Exch Out T',
                                line = dict(color = 'lime', width = 1)))
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[1],
-                               name = 'Air Middle T',
+                               name = 'Exch Intake T',
                                line = dict(color = 'seagreen', width = 1)))
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[2],
-                               name = 'Air Cold T',
+                               name = 'Nacelle Bottom T',
                                line = dict(color = 'dodgerblue', width = 1)))
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[3],
-                               name = 'Cover Out kW',
-                               yaxis = 'y2',
+                               name = 'Nacelle Top Front W',
+                            #    yaxis = 'y2',
                                line = dict(color = 'darkturquoise')))
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[4],
-                               name  = 'Components In kW',
-                               yaxis = 'y2',
+                               name  = 'Components In W',
+                            #    yaxis = 'y2',
                                line  = dict(color = 'olive')))
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[5],
-                               name  = 'Exchanger Out In kW',
-                               yaxis = 'y2',
+                               name  = 'Exchanger Out In W',
+                            #    yaxis = 'y2',
                                line  = dict(color = 'green')))
     traceNac.append(go.Scatter(x = nacelleTimes,
                                y = nacGraph[6],
                                name = 'Ambient T',
                                line = dict(color = 'black')))
-    traceNac.append(go.Scatter(x = nacelleExcesTimes,
-                               y = nacGraph[7],
-                               name = 'Temperature ALARM!!',
-                               mode = 'markers',
-                               marker = dict(size = 10, color = 'red',)))
+    traceNac.append(go.Scatter(x = nacelleTimes,
+                               y = nacGraph[6],
+                               name = 'Hub T',
+                               line = dict(color = 'orange')))
 
 
     layout = dict(
         title='Nacelle temperatures vs. Time',
         xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1,
+                         label='1m',
+                         step='month',
+                         stepmode='backward'),
+                    dict(count=6,
+                         label='6m',
+                         step='month',
+                         stepmode='backward'),
+                    dict(count=1,
+                        label='YTD',
+                        step='year',
+                        stepmode='todate'),
+                    dict(count=1,
+                        label='1y',
+                        step='year',
+                        stepmode='backward'),
+                    dict(step='all')
+                ])
+            ),
             rangeslider=dict(),
             type='date'
         ),
         yaxis=dict(
             title='Temperature [deg C]'
-        ),
-        yaxis2=dict(
-            title      ='Exchanger mode [-]',
-            overlaying ='y',
-            side       = 'right',
-            range      = [0, 100]
+        # ),
+        # yaxis2=dict(
+        #     title      ='Exchanger mode [-]',
+        #     overlaying ='y',
+        #     side       = 'right',
+        #     range      = [0, 100]
         )
     )
 
     fig = go.Figure(data=traceNac, layout=layout)
     pyoff.plot(fig, filename= (config.currentLocation+'nacelleTempsGraph.html'), auto_open=False)
+# Timeseries of temperate and cooling conditions in the TOWER
+def graphTower(stateSeries):
+
+    towerReducedSeries = reduceTowerPoints(stateSeries)
+
+    towGraph = [[item.air_component.temperature['Tower_top']            for item in towerReducedSeries],
+                [item.air_component.temperature['Converter_platform']   for item in towerReducedSeries],
+                [item.air_component.temperature['Transformer_platform'] for item in towerReducedSeries],
+                [item.air_component.temperature['Switchgear_platform']  for item in towerReducedSeries],
+                [item.air_component.temperature['Tower_middle']         for item in towerReducedSeries],
+                [(item.air_component.heatFlows[('Switchgear_inlet','Switchgear_platform')]
+                 + item.air_component.heatFlows[('Transformer_inlet','Transformer_platform')]
+                 + item.air_component.heatFlows[('Converter_inlet','Converter_platform')])/1000  for item in towerReducedSeries],
+                [-(item.air_component.heatFlows[('Switchgear_platform','Transformer_platform')]
+                 + item.air_component.heatFlows[('Transformer_platform','Converter_platform')]
+                 + item.air_component.heatFlows[('Converter_platform', 'Tower_middle')]
+                 + item.air_component.heatFlows[('Tower_middle','Tower_top')])/1000  for item in towerReducedSeries],
+                [item.Tamb                  for item in towerReducedSeries]]
+    towerTimes = [item.time for item in towerReducedSeries]
+    # nacelleExcesTimes   = [item.time for item in stateSeries if item.nacelle.alarm]
+
+    traceTow = []
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[0],
+                               name = 'Tower top T',
+                               line = dict(color = 'lime', width = 1)))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[1],
+                               name = 'Converter plat T',
+                               line = dict(color = 'seagreen', width = 1)))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[2],
+                               name = 'Transformer plat T',
+                               line = dict(color = 'dodgerblue', width = 1)))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[3],
+                               name = 'Switchgear plat W',
+                            #    yaxis = 'y2',
+                               line = dict(color = 'darkturquoise')))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[4],
+                               name  = 'Tower Middle T',
+                            #    yaxis = 'y2',
+                               line  = dict(color = 'olive')))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[5],
+                               name  = 'Tower components W',
+                            #    yaxis = 'y2',
+                               line  = dict(color = 'green')))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[6],
+                               name  = 'Tower cooling W',
+                            #    yaxis = 'y2',
+                               line  = dict(color = 'orange')))
+    traceTow.append(go.Scatter(x = towerTimes,
+                               y = towGraph[7],
+                               name = 'Ambient T',
+                               line = dict(color = 'black')))
+    # traceTow.append(go.Scatter(x = nacelleExcesTimes,
+    #                            y = nacGraph[7],
+    #                            name = 'Temperature ALARM!!',
+    #                            mode = 'markers',
+    #                            marker = dict(size = 10, color = 'red',)))
+
+
+    layout = dict(
+        title='Nacelle temperatures vs. Time',
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1,
+                         label='1m',
+                         step='month',
+                         stepmode='backward'),
+                    dict(count=6,
+                         label='6m',
+                         step='month',
+                         stepmode='backward'),
+                    dict(count=1,
+                        label='YTD',
+                        step='year',
+                        stepmode='todate'),
+                    dict(count=1,
+                        label='1y',
+                        step='year',
+                        stepmode='backward'),
+                    dict(step='all')
+                ])
+            ),
+            rangeslider=dict(),
+            type='date'
+        ),
+        yaxis=dict(
+            title='Temperature [deg C]'
+        # ),
+        # yaxis2=dict(
+        #     title      ='Exchanger mode [-]',
+        #     overlaying ='y',
+        #     side       = 'right',
+        #     range      = [0, 100]
+        )
+    )
+
+    fig = go.Figure(data=traceTow, layout=layout)
+    pyoff.plot(fig, filename= (config.currentLocation+'towerTempsGraph.html'), auto_open=False)
 # Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on transformer.oilHot
 def reduceTrafoPoints(inputSeries):
     outputSeries = []
@@ -576,13 +706,22 @@ def reduceGearboxPoints(inputSeries):
         if (i%config.reductionFactor != 0) & (inputSeries[i].gearbox.oilCold > outputSeries[-1].gearbox.oilCold):
             outputSeries[-1] = inputSeries[i]
     return outputSeries
-# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on nacelle.airHot
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on Nacelle_top_rear
 def reduceNacellePoints(inputSeries):
     outputSeries = []
     for i in range(len(inputSeries)-1):
         if (i%config.reductionFactor == 0):
             outputSeries.append(inputSeries[i])
-        if (i%config.reductionFactor != 0) & (inputSeries[i].nacelle.airHot > outputSeries[-1].nacelle.airHot):
+        if (i%config.reductionFactor != 0) & (inputSeries[i].air_component.temperature['Nacelle_top_rear'] > outputSeries[-1].air_component.temperature['Nacelle_top_rear']):
+            outputSeries[-1] = inputSeries[i]
+    return outputSeries
+# Reduces the timeseries to get more manageable graphs, takes the most adverse of every 10 points based on Converter_platform
+def reduceTowerPoints(inputSeries):
+    outputSeries = []
+    for i in range(len(inputSeries)-1):
+        if (i%config.reductionFactor == 0):
+            outputSeries.append(inputSeries[i])
+        if (i%config.reductionFactor != 0) & (inputSeries[i].air_component.temperature['Converter_platform'] > outputSeries[-1].air_component.temperature['Converter_platform']):
             outputSeries[-1] = inputSeries[i]
     return outputSeries
 # Timeseries comparing achievable power production and desired grid conditions with those necessary due to derating

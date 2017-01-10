@@ -2,7 +2,7 @@
 # This file contains assorted variables to make them available in all the molules
 
 dt              = 60
-reductionFactor = 10
+reductionFactor = 1
 exchLag         = 100
 strechFactor    = 10
 powerCurve      = []
