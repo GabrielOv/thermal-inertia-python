@@ -22,16 +22,16 @@ def counted(fn):
 
 # Object that represents the wind turbine generator an a certain time
 class machineState(object):
-    # GBM = air_volume_GBM('nodes.csv', 'bonds.csv')
+    GBM = air_volume_GBM()
     # self.machineTimeStep       = counter(machineTimeStep)
     def __init__(self,T_0):
-        # machineState.GBM.solve()
+        machineState.GBM.loadModelData('nodes.tab', 'bonds.tab')
+        self.GBM.dt      = 10*config.dt
         self.transformer = tr_component(T_0)
         self.converter   = cv_component(T_0)
         self.generator   = gn_component(T_0)
         self.gearbox     = gb_component(T_0)
-        self.nacelle     = nac_component(T_0)
-        # self.air_component=air_component()
+        self.air_component=air_component()
         self.power       = 0
         self.potential   = 0
         self.PF          = 1
@@ -54,15 +54,13 @@ class machineState(object):
         newTime.converter.timeStep(newTime.transformer.powerIN,newTime.PF,newTime.V,Tamb) # Calculate CONVERTER
         newTime.generator.timeStep(newTime.converter.powerIN,Tamb)                  # Calculate GENERATOR
         newTime.gearbox.timeStep(newTime.generator.powerIN,Tamb)                    # Calculate GEARBOX
-        newTime.nacelle.timeStep(newTime.generator.losses*(1-newTime.generator.split),newTime.gearbox.losses*(1-newTime.gearbox.split),Tamb)
-        # if  machineState.machineTimeStep.called % 100 == 0:
-        #     [heatFlow_v,forced_v] = self.buildUpdateVectors()
-        #     machineState.GBM.updateHeatFlows(heatFlow_v)
-        #     # machineState.GMB.updateFanFlows(forced_v)
-        #     machineState.GBM.solve()
-        #     machineState.GBM.printInfo()
-        #     print('crank')
-            # GBM_instance.dump_GBM_to_store()
+        if  machineState.machineTimeStep.called % 10 == 0:
+            machineState.GBM.instance.tempExt['Air_treatment_system'] = Tamb
+            machineState.GBM.solve()
+            machineState.GBM.advanceTemperatures()
+            machineState.GBM.updateHeatFlows(newTime)
+            machineState.GBM.updateAirFlows(newTime)
+        newTime.air_component.dump_GBM_to_store()
 
         return newTime
     # Returns interpolation of power produtcion given a  wind speed
@@ -70,7 +68,7 @@ class machineState(object):
         return  np.interp(self.wind, config.powerCurve[0], config.powerCurve[1])
     # Returns a vector with the alarm state for all components
     def getAlarms(self):
-        return [self.transformer.alarm, self.converter.alarm, self.generator.alarm, self.gearbox.alarm, self.nacelle.alarm]
+        return [self.transformer.alarm, self.converter.alarm, self.generator.alarm, self.gearbox.alarm]
     # Evaluates the need to derate and aplies the necessary production modifications at the beginning of the timestep
     def derateIfNeeded(self, power, PF, V, Tamb):
         alarms = self.getAlarms()
@@ -127,6 +125,7 @@ class tr_component(object):
         self.waterCold = T_0
         self.powerIN   = 0
         self.losses    = 0
+        self.lossesAir = 0
         self.powerOUT  = 0
         self.water_air_trans = 0
         self.alarm     = False
@@ -170,11 +169,12 @@ class tr_component(object):
         self.exchCoeffFunc()
 
         solid_oil     = (self.solid    - self.oilCold) * self.solid_oil_trans
-        self.oilWater     = (self.oilHot   - self.waterCold) * self.oil_water_trans
+        self.oilWater = (self.oilHot   - self.waterCold) * self.oil_water_trans
         self.heatOut  = (self.waterHot - Tamb) * self.water_air_trans
 
 
         self.solid     += (self.losses * self.split - solid_oil) * config.dt  / self.solid_int
+        self.lossesAir = self.losses * (1- self.split)
         self.oilCold   += (solid_oil - self.oilWater)    * config.dt  / self.oil_int
         self.waterCold += (self.oilWater - self.heatOut) * config.dt  / self.water_int
 
@@ -197,6 +197,7 @@ class cv_component(object):
         self.waterCold = T_0
         self.powerIN   = 0
         self.losses    = 0
+        self.lossesAir = 0
         self.powerOUT  = 0
         self.water_air_trans = 0
         self.alarm     = False
@@ -243,6 +244,7 @@ class cv_component(object):
         self.heatOut    = (self.waterHot - Tamb) * self.water_air_trans
 
         self.solid     += (self.losses * self.split - self.solidWater) * config.dt  / self.solid_int
+        self.lossesAir = self.losses * (1- self.split)
         self.waterCold += (self.solidWater - self.heatOut) * config.dt  / self.water_int
 
         self.waterHot   = self.waterCold + self.solidWater / self.waterC
@@ -271,6 +273,7 @@ class gn_component(object):
         self.waterCold = T_0
         self.powerIN   = 0
         self.losses    = 0
+        self.lossesAir = 0
         self.powerOUT  = 0
         self.water_air_trans = 0
         self.alarm     = False
@@ -321,6 +324,7 @@ class gn_component(object):
 
         lossesRotor      = 0.4 * self.losses*self.split
         lossesStator     = self.losses*self.split - lossesRotor
+        self.lossesAir = self.losses * (1- self.split)
 
         self.rotor     += (lossesRotor  - rotor_air) * config.dt  / self.rotor_int
         self.stator    += (lossesStator - stator_air - stator_water) * config.dt  / self.stator_int
@@ -350,6 +354,7 @@ class gb_component(object):
         self.waterCold = T_0
         self.powerIN   = 0
         self.losses    = 0
+        self.lossesAir = 0
         self.powerOUT  = 0
         self.water_air_trans = 0
         self.alarm     = False
@@ -399,6 +404,7 @@ class gb_component(object):
         self.heatOut  = (self.waterHot - Tamb) * self.water_air_trans
 
         self.solid     += (self.losses * self.split - solid_oil) * config.dt  / self.solid_int
+        self.lossesAir = self.losses * (1- self.split)
         self.oilCold   += (solid_oil - self.oilWater)    * config.dt  / self.oil_int
         self.waterCold += (self.oilWater - self.heatOut) * config.dt  / self.water_int
 
@@ -406,71 +412,66 @@ class gb_component(object):
         self.waterHot   = self.waterCold + self.oilWater / self.waterC
         self.alarmFunc()
 # Object which holds the behaviour parameters and the variables that define the state of a NACELLE
-class nac_component(object):
-    air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
-    airC               = 10      #[kW/K] Heat carryng capacity of the water current
-    airCold_Limit      = 38
-    exchCoeffs         = [0.1, 1, 1.5, 2, 2.556]
-    cover_trans        = [0.1, 0.25, 0.5, 1, 1.5]  #[kW/K]
+# class nac_component(object):
+#     air_int            = 400     #[kJ/K] Thermal inertia for the oil bath
+#     airC               = 10      #[kW/K] Heat carryng capacity of the water current
+#     airCold_Limit      = 38
+#     exchCoeffs         = [0.1, 1, 1.5, 2, 2.556]
+#     cover_trans        = [0.1, 0.25, 0.5, 1, 1.5]  #[kW/K]
+#
+#     def __init__(self,T_0=0):
+#         self.airHot        = T_0
+#         self.airMiddle     = T_0
+#         self.airCold       = T_0
+#         self.coverOut      = 0
+#         self.componentsIn  = 0
+#         self.exchOut       = 0
+#         self.alarm         = False
+#         self.exchMode      = 0
+#         self.exchLag       = 0
+#
+#     # Function to chooses the cooling mode as a function of waterCold temperature. Presents hysteresis and a certain lag to avoid constant switching
+#     def exchCoeffFunc(self):
+#         self.exchLag  -= 1
+#         limitsUp=  [ 0, 30, 33, 36, 40]
+#         limitsDown=[ 0, 28, 31, 34, 37]
+#         if self.airMiddle > limitsUp[self.exchMode]:
+#             for i in range(self.exchMode,len(limitsUp)):
+#                 if self.airMiddle > limitsUp[i]:
+#                     self.exchMode = i
+#                     self.exchLag  = config.exchLag
+#         elif (self.airMiddle < limitsDown[self.exchMode]) & (self.exchLag<1) :
+#             for i in range(self.exchMode,0,-1):
+#                 if self.airMiddle < limitsDown[i]:
+#                     self.exchMode = i-1
+#         #self.water_air_trans = self.exchCoeffs[self.exchMode]
+#     # Activate alarm if airCold temperature excedes the limit
+#     def alarmFunc(self):
+#         if self.airCold > self.airCold_Limit:
+#             self.alarm = True
+#         else:
+#             self.alarm = False
+#     def nacelleExhangerFunction (self, airHot,Tamb):
+#         self.exchCoeffFunc()
+#         return (airHot-Tamb)*self.exchCoeffs[self.exchMode]
+#     # Calculation o the evolution of internal variables
+#     def timeStep(self, ge_contribution, gb_contribution, Tamb):
+#         self.componentsIn = ge_contribution + gb_contribution + 5   # the extra bit is for the other components in the NACELLE
+#
+#         self.coverOut  = (self.airHot   - Tamb) * self.cover_trans[self.exchMode]
+#         self.airMiddle = self.airHot - self.coverOut / self.airC
+#         self.exchOut   = self.nacelleExhangerFunction(self.airMiddle, Tamb)
+#
+#         self.airCold   += (self.componentsIn - self.coverOut - self.exchOut) * config.dt  / self.air_int
+#
+#         self.airHot     = self.airCold   + self.componentsIn / self.airC
+#         self.alarmFunc()
 
-    def __init__(self,T_0=0):
-        self.airHot        = T_0
-        self.airMiddle     = T_0
-        self.airCold       = T_0
-        self.coverOut      = 0
-        self.componentsIn  = 0
-        self.exchOut       = 0
-        self.alarm         = False
-        self.exchMode      = 0
-        self.exchLag       = 0
-
-    # Function to chooses the cooling mode as a function of waterCold temperature. Presents hysteresis and a certain lag to avoid constant switching
-    def exchCoeffFunc(self):
-        self.exchLag  -= 1
-        limitsUp=  [ 0, 30, 33, 36, 40]
-        limitsDown=[ 0, 28, 31, 34, 37]
-        if self.airMiddle > limitsUp[self.exchMode]:
-            for i in range(self.exchMode,len(limitsUp)):
-                if self.airMiddle > limitsUp[i]:
-                    self.exchMode = i
-                    self.exchLag  = config.exchLag
-        elif (self.airMiddle < limitsDown[self.exchMode]) & (self.exchLag<1) :
-            for i in range(self.exchMode,0,-1):
-                if self.airMiddle < limitsDown[i]:
-                    self.exchMode = i-1
-        #self.water_air_trans = self.exchCoeffs[self.exchMode]
-    # Activate alarm if airCold temperature excedes the limit
-    def alarmFunc(self):
-        if self.airCold > self.airCold_Limit:
-            self.alarm = True
-        else:
-            self.alarm = False
-    def nacelleExhangerFunction (self, airHot,Tamb):
-        self.exchCoeffFunc()
-        return (airHot-Tamb)*self.exchCoeffs[self.exchMode]
-    # Calculation o the evolution of internal variables
-    def timeStep(self, ge_contribution, gb_contribution, Tamb):
-        self.componentsIn = ge_contribution + gb_contribution + 5   # the extra bit is for the other components in the NACELLE
-
-        self.coverOut  = (self.airHot   - Tamb) * self.cover_trans[self.exchMode]
-        self.airMiddle = self.airHot - self.coverOut / self.airC
-        self.exchOut   = self.nacelleExhangerFunction(self.airMiddle, Tamb)
-
-        self.airCold   += (self.componentsIn - self.coverOut - self.exchOut) * config.dt  / self.air_int
-
-        self.airHot     = self.airCold   + self.componentsIn / self.airC
-        self.alarmFunc()
 # Object which holds the behaviour parameters and the variables that define the state of a AIRMASS in tower and NACELLE
 class air_component(object):
     def __init__(self):
-        self.flowVector         = [machineState.GBM.model.flow[i].value for i in machineState.GBM.model.bond_set]
-        self.pressureVector     = [machineState.GBM.model.pressure[i].value for i in machineState.GBM.model.node_set]
-        self.externalFlowVector = [machineState.GBM.model.exterior[i].value for i in machineState.GBM.model.node_set]
-        self.temperatureVector  = [machineState.GBM.model.temper[i].value for i in machineState.GBM.model.node_set]
-        # self.heatFlowVector     = [machineState.GBM.bond_data.heatFlow[i].value for i in machineState.GBM.model.bond_set]
-        # self.heatDeltaVector    = [machineState.GBM.model.flow[i].value for i in machineState.GBM.model.bond_set]
+        [self.temperature,self.flow,self.heatFlows] = machineState.GBM.resultsToDictionary()
     def dump_GBM_to_store(self):
-        self.flowVector         = [machineState.GBM.model.flow[i].value for i in machineState.GBM.model.bond_set]
-        self.pressureVector     = [machineState.GBM.model.pressure[i].value for i in machineState.GBM.model.node_set]
-        self.externalFlowVector = [machineState.GBM.model.exterior[i].value for i in machineState.GBM.model.node_set]
-        self.temperatureVector  = [machineState.GBM.model.temper[i].value for i in machineState.GBM.model.node_set]
+        [self.temperature,self.flow,self.heatFlows] = machineState.GBM.resultsToDictionary()
+
+        # print(self.temperature['Hub'].value)
